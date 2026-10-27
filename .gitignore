@@ -1,0 +1,9 @@
+# generated at run time
+generated_assets/
+runs/
+runs_fake/
+results/
+checks_report.txt
+__pycache__/
+*.pyc
+.venv/

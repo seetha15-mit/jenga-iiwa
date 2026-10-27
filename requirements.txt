@@ -1,0 +1,5 @@
+# Installed by the commands in docs/SETUP.md (uv pip install ...); listed here so the needed packages are visible.
+drake==1.57.0
+manipulation[letter]
+scipy
+rtree
