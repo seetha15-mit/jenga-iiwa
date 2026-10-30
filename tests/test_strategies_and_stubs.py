@@ -30,10 +30,6 @@ class TestStrategies(unittest.TestCase):
         for name in ("rule_based", "perception", "force_guided"):
             with self.assertRaises(NotImplementedError):
                 strategies.get_strategy(name)(t, [0], cfg, np.random.default_rng(0))
-        with self.assertRaises(NotImplementedError):
-            end_pinch.plan_pull(None, cfg)
-        with self.assertRaises(NotImplementedError):
-            end_pinch.plan_place(None, cfg)
 
     def test_push_is_a_placeholder(self):
         for fn, args in ((push.can_pull, (None, 0, None)), (push.plan_pull, (None, None))):

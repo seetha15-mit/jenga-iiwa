@@ -26,7 +26,7 @@ F-02 Gripper frame G: x finger axis, y reach axis. Hand body 146 x 72.5 x 50 mm;
 F-03 The wrist centre is on the reach axis 0.171 m behind G, so a level hand puts the wrist at pad height (derived; matched the home pose to 1 mm).
 F-04 About 0.1x real time with hydroelastic contact, 9 blocks plus gripper, one machine (measured; no real turn measured yet).
 F-05 The pset Cartesian controller ignores joint limits (measured). F-06 Wrist force reads in the gripper frame and includes the hand's weight, 10.7 N at rest (measured).
-F-07 Drake 1.57.0, manipulation 2026.9.17, Python 3.13, WSL2 (measured).
+F-07 Drake 1.57.0, Python 3.13 on WSL2 (manipulation 2026.9.17) and on macOS arm64 (manipulation 2026.10.17); full `run_checks.py` passes on macOS (measured).
 F-08 The hardware station's iiwa driver aborts (`inverse_dynamics_controller.cc: num_positions == dim`) when the arm is welded to a body that has joints; a base model alone and an arm welded to a fixed named frame build fine (measured, `diagnose_base.py` run).
 
 ## Decisions
@@ -35,7 +35,7 @@ F-08 The hardware station's iiwa driver aborts (`inverse_dynamics_controller.cc:
 | D-01 | I build the shared infrastructure and a fake mover; the team writes the real pull and place (`methods/end_pinch.py`: `plan_pull`, `plan_place`). The baseline is "done" when those are plugged in and random plays real trials | the team must own the manipulation code | user |
 | D-02 | Rolling base (three joints x, y, yaw) with a list of stations (`STATION_ANGLES_DEG`); the team's steps get targets in the robot frame only; replace `choose_station` and `base.base_path` to move to a free-moving base | reaches every face without touching the tower | user |
 | D-03 | One persistent simulator per trial (`scene.Sim`), plant built by hand in the pset style (`AddMultibodyPlantSceneGraph` + `Parser`, no hardware station) | no tower reset or rebuild; the station cannot drive an arm on a rolling base (F-08) | user |
-| D-04 | Plan-then-execute: the team returns waypoint lists, `executor.run_plan` plays them (first waypoint by joint-space move, the rest straight lines) | learns the pset pattern; no Drake systems for the team | user |
+| D-04 | Plan-then-execute: the team returns waypoint lists, `executor.run_plan` plays them (first waypoint by joint-space move, the rest straight lines). A leg takes the arriving waypoint's `seconds` if set, else distance / `WAYPOINT_SPEED_MS` (at least 0.1 s); a waypoint's opening is commanded from the start of the next leg | learns the pset pattern; no Drake systems for the team; per-leg times let a pull be slow and the fingers finish closing before the hand moves | user |
 | D-05 | `PLATFORM_HEIGHT_M` 0.10 is a starting value for the team to sweep. `STATION_STANDOFF_M` 0.95 and `BASE_TRAVEL_RADIUS_M` 1.2: Drake IK passed 0.90, 0.95 and 1.00 m (worst joint margin 16, 26 and 31 deg over all layers and poses) and failed 0.80 and 0.85 m | a level hand needs the tower far out (wrist 0.171 m behind the pads) | user / measured (IK only, no collisions) |
 | D-06 | Block scale 1.45 = 108.75 x 36.25 x 21.75 mm, gripper command 110 mm. Margins per side: jaw 3.1 mm, finger height 0.875 mm | the finger-height margin is the tight one | user / derived |
 | D-07 | `EXTRACTION_METHOD` switch; `methods/push.py` is a stub. Shared: tower state, legal pulls, collapse, logging. Per method: reach rules, plan_pull, plan_place | room for push without designing it | user |
@@ -50,7 +50,7 @@ F-08 The hardware station's iiwa driver aborts (`inverse_dynamics_controller.cc:
 | D-16 | Starting physics: gap 0.5 mm, density 700 kg/m^3, friction 0.5 | something must make the tower stand | estimate |
 | D-17 | One `config.py`, every line tagged with its source; `python run_checks.py` writes one `checks_report.txt` | easy for non-programmers | user |
 | D-18 | Docs in `docs/`; `CLAUDE.md` has ground rules for AI tools; pset-style plain code with docstrings | course and team level | user |
-| D-19 | Arm, fingers and base are PD-controlled joints of the plant (`ARM_KP/KD`, `FINGER_KP/KD`, `BASE_KP/KD`); gravity is off for the ARM links only (an ideal gravity-compensated arm), so the hand keeps its weight in the wrist force | the psets' own controllers are not in the project files and ran at a 100 us step (too slow for contact); the plant's PD joints appear in no pset, so this is untested | estimate |
+| D-19 | Arm, fingers and base are PD-controlled joints of the plant (`ARM_KP/KD`, `FINGER_KP/KD`, `BASE_KP/KD`); gravity is off for the ARM links only (an ideal gravity-compensated arm), so the hand keeps its weight in the wrist force | the psets' own controllers are not in the project files and ran at a 100 us step (too slow for contact); the plant's PD joints appear in no pset; the executor check passes, but no grasp has been tried | measured (no-contact motions only) |
 | D-20 | The project has its own virtual environment (`.venv` in the repo, Drake pinned to 1.57.0), made with the course's uv steps (`docs/SETUP.md`) | package versions stay fixed and the pset setup is untouched | user |
 
 ## Open items (move to Decisions when decided)
@@ -61,7 +61,9 @@ O-4 Platform height and standoff sweep; the reachability check reports how far t
 O-5 Push method details (tool, tolerances). O-6 Placement beyond 6 layers (carry pose and hand-body clearance over a taller tower).
 O-7 Finger-height margin 0.875 mm: check in Drake that a level hand is accurate enough (first thing for the pull).
 
-## Not yet run (written without Drake available; `run_checks.py` is how we find out)
-Hand-built plant (`scene.py`): the PD-actuator calls (`set_controller_gains`, `get_desired_state_input_port`), SAP with hydroelastic contact,
-disabling gravity on the arm, welding the arm to the rolling base, commands fed to a running simulator, Meshcat recording of a long trial,
-the pad gap read from the model, the wrist-force port. Everything in `jenga/` that imports `pydrake`.
+## Checked in Drake, and what is still unchecked
+Passed in full `run_checks.py` (measured, 2026-10-29, macOS): the hand-built plant builds with SAP and hydroelastic contact; the tower
+stands (1.05 mm in 3 s); the pad gap read from the model (115 mm); the robot frame agrees with the full scene (0.00 mm); the wrist-force
+port (10.7 N at rest, so the hand keeps its weight); the PD joints follow commands in a running simulator (four executor motions); the
+rolling base visits stations without disturbing the tower; a 2-turn fake trial writes tagged files and a replay.
+Still unchecked: any real grasp or pull (O-7), arm collisions (O-1), a Meshcat recording of a long trial, the time of a real turn (F-04).

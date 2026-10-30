@@ -7,3 +7,4 @@ checks_report.txt
 __pycache__/
 *.pyc
 .venv/
+scratch/

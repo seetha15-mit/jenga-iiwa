@@ -53,19 +53,22 @@ def pose_delta(X_RG: RigidTransform, X_RG_target: RigidTransform) -> np.ndarray:
 
 
 def waypoint_times(stops, speed: float):
-    """When to be at each stop: travel time = distance / speed, at least 0.1 s (closing the fingers is a
-    zero-distance move but time must still grow)."""
+    """When to be at each stop.  A stop with its own `seconds` takes that long to reach; otherwise travel
+    time = distance / speed, at least 0.1 s (closing the fingers is a zero-distance move but time must still grow)."""
     times = [0.0]
     for i in range(len(stops) - 1):
-        distance = pose_distance(pose_delta(stops[i].X_RG, stops[i + 1].X_RG))
-        times.append(times[i] + max(distance / speed, 0.1))
+        leg = stops[i + 1].seconds
+        if leg is None:
+            distance = pose_distance(pose_delta(stops[i].X_RG, stops[i + 1].X_RG))
+            leg = max(distance / speed, 0.1)
+        times.append(times[i] + leg)
     return times
 
 
 def timed_trajectories(waypoints, X_RG_start, start_opening: float, speed: float):
     """(hand velocity trajectory, finger opening trajectory) for a plan.  Adds a stop at the starting pose (the
     controller is feedforward) and repeats the last stop so the trajectory ends standing still."""
-    stops = [Waypoint(X_RG_start, start_opening)] + list(waypoints) + [waypoints[-1]]
+    stops = [Waypoint(X_RG_start, start_opening)] + list(waypoints) + [waypoints[-1]._replace(seconds=None)]
     times = waypoint_times(stops, speed)
     poses = [w.X_RG for w in stops]
     openings = [w.opening for w in stops]

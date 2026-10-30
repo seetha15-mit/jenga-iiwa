@@ -33,9 +33,10 @@ class PhaseResult:
 
 
 def _resolve(cfg, waypoints):
-    """Fill in default openings and convert poses to RigidTransform."""
+    """Fill in default openings and convert poses to RigidTransform; keep each leg's own time."""
     return [
-        Waypoint(as_transform(w.X_RG), cfg.FINGER_OPEN_COMMAND_M if w.opening is None else float(w.opening))
+        Waypoint(as_transform(w.X_RG), cfg.FINGER_OPEN_COMMAND_M if w.opening is None else float(w.opening),
+                 w.seconds)
         for w in waypoints
     ]
 

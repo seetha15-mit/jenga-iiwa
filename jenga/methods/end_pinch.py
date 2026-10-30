@@ -17,6 +17,8 @@ below.  The near and middle slots are clear.  The far slot is filled from the op
 it is the near slot.  (geometry.housing_overlap has the numbers.)
 """
 
+import numpy as np
+
 from jenga import base
 from jenga import geometry as geo
 from jenga.waypoint import Waypoint  # noqa: F401  (the team's steps return lists of these)
@@ -60,6 +62,9 @@ def choose_place_station(tower, layer: int, slot: int, cfg, current_station: int
     return base.nearest_station(cfg, options, current_station)
 
 
+    
+
+
 # ====================================================================== the team's steps
 def plan_pull(X_RB, cfg):
     """Waypoints that take the hand from where it is, pinch the block by its ends, pull it out
@@ -91,7 +96,28 @@ def plan_pull(X_RB, cfg):
     The next step, plan_place, starts from the last pose you return here.
     """
     # ---- BEGIN CODE TO BE WRITTEN ----
-    raise NotImplementedError("TODO: write plan_pull (see docs/FOR_THE_TEAM.md)")
+    from pydrake.all import RigidTransform, RotationMatrix  # here, not at the top: the quick tests import this file without Drake
+
+    # Check orientation of the block being chosen
+    L,W,H = geo.block_dims(cfg)
+    bx = X_RB.rotation().matrix()[:, 0]
+    if bx[1] < 0:
+        X_RB = X_RB @ RigidTransform(RotationMatrix.MakeZRotation(np.pi), [0, 0, 0])
+    R_BG = RotationMatrix.MakeXRotation(np.radians(-180))
+    X_BG = RigidTransform(R_BG,[0,cfg.PAD_CENTRE_FROM_G_M,0.5*H])
+    offset = RigidTransform([0,-0.1,0])
+    upoffset = RigidTransform([0,0,-0.3])
+    pickpoint = X_RB@X_BG
+    pickpounce = pickpoint@offset
+    wayplist = []
+    wayplist.append(Waypoint(pickpounce, cfg.FINGER_OPEN_COMMAND_M))     # 1. get near, open
+    wayplist.append(Waypoint(pickpoint,  cfg.FINGER_OPEN_COMMAND_M))
+    wayplist.append(Waypoint(pickpoint,  L-cfg.FINGER_SQUEEZE_M))     # 2. move onto the block
+    wayplist.append(Waypoint(pickpoint,  L-cfg.FINGER_SQUEEZE_M,1.0))# 3. SAME pose, close = grasp
+    wayplist.append(Waypoint(pickpounce, L-cfg.FINGER_SQUEEZE_M,6.0))   # 4. retreat holding it
+    wayplist.append(Waypoint(pickpounce@upoffset,L-cfg.FINGER_SQUEEZE_M))
+    return wayplist
+    
     # ---- END CODE TO BE WRITTEN ----
 
 
@@ -115,5 +141,23 @@ def plan_place(X_RT, cfg):
     Warnings: as for plan_pull.  Also: the block is placed 'as it is', with no re-grasp.
     """
     # ---- BEGIN CODE TO BE WRITTEN ----
-    raise NotImplementedError("TODO: write plan_place (see docs/FOR_THE_TEAM.md)")
+    from pydrake.all import RigidTransform, RotationMatrix  # here, not at the top: the quick tests import this file without Drake
+    
+    # Check orientation of the block being chosen
+    L,W,H = geo.block_dims(cfg)
+    bx = X_RT.rotation().matrix()[:, 0]
+    if bx[1] < 0:
+        X_RT = X_RT @ RigidTransform(RotationMatrix.MakeZRotation(np.pi), [0, 0, 0])
+    R_TG = RotationMatrix.MakeXRotation(np.radians(-180))
+    X_TG = RigidTransform(R_TG,[0,cfg.PAD_CENTRE_FROM_G_M,0.5*H])
+    offset = RigidTransform([0,0,-0.2])
+    placepoint = X_RT@X_TG
+    placepounce = placepoint@offset
+    wayplist = []
+    wayplist.append(Waypoint(placepounce, L-cfg.FINGER_SQUEEZE_M))   
+    wayplist.append(Waypoint(placepoint,  L-cfg.FINGER_SQUEEZE_M))    
+    wayplist.append(Waypoint(placepoint,  cfg.FINGER_OPEN_COMMAND_M))
+    wayplist.append(Waypoint(placepoint,  cfg.FINGER_OPEN_COMMAND_M, 1.0))   
+    wayplist.append(Waypoint(placepounce, cfg.FINGER_OPEN_COMMAND_M))   
+    return wayplist
     # ---- END CODE TO BE WRITTEN ----
