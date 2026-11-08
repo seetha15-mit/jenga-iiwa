@@ -94,15 +94,17 @@ def plan_pull(X_RB, cfg):
     wayplist = []
     wayplist.append(Waypoint(pickpounce, cfg.FINGER_OPEN_COMMAND_M))     # 1. get near, open
     wayplist.append(Waypoint(pickpoint,  cfg.FINGER_OPEN_COMMAND_M))
-    wayplist.append(Waypoint(pickpoint,  W-1*cfg.FINGER_SQUEEZE_M))
-    wayplist.append(Waypoint(pickpoint@lift,  W-1*cfg.FINGER_SQUEEZE_M,1))      # 2. move onto the block
-    wayplist.append(Waypoint(pickpounce@lift, W-1*cfg.FINGER_SQUEEZE_M))
-    wayplist.append(Waypoint(pickpounce@upoffset, W-1*cfg.FINGER_SQUEEZE_M))
+    wayplist.append(Waypoint(pickpoint,  W-1.75*cfg.FINGER_SQUEEZE_M))
+    wayplist.append(Waypoint(pickpoint@lift,  W-1.75*cfg.FINGER_SQUEEZE_M,1))      # 2. move onto the block
+    wayplist.append(Waypoint(pickpounce@lift, W-1.75*cfg.FINGER_SQUEEZE_M))
+    wayplist.append(Waypoint(pickpounce@upoffset, W-1.75*cfg.FINGER_SQUEEZE_M))
     return wayplist
 
-
-def plan_regrab(X_RB, cfg):
-    """Pick the block up off the pedestal by its ends (D-22): the same grasp end-pinch uses in the tower."""
+def plan_ped_place(X_RB, cfg):
+    """Waypoints that carry the pulled block to the pedestal on the robot's left (D-22), set it down with its
+    long axis pointing at the tower, let go and rise.  The first waypoint is a joint move, which also puts the
+    arm in a configuration that can reach the pedestal; plan_regrab then picks the block up level by its ends.
+    X_RB: the block's pose in the hand after plan_pull (unused: the pedestal pose comes from config)."""
     from pydrake.all import RigidTransform, RotationMatrix
     L,W,H = geo.block_dims(cfg)
     d = cfg.PEDESTAL_DISTANCE_M / np.sqrt(2)
@@ -114,13 +116,17 @@ def plan_regrab(X_RB, cfg):
     above = RigidTransform([0, 0, -0.05])
     setpounce = setpoint@above
     wayplist = []
-    wayplist.append(Waypoint(setpounce,  W-1*cfg.FINGER_SQUEEZE_M))
-    wayplist.append(Waypoint(setpoint,  W-1*cfg.FINGER_SQUEEZE_M))
+    wayplist.append(Waypoint(setpounce,  W-1.75*cfg.FINGER_SQUEEZE_M))
+    wayplist.append(Waypoint(setpoint,  W-1.75*cfg.FINGER_SQUEEZE_M))
     wayplist.append(Waypoint(setpoint,  cfg.FINGER_OPEN_COMMAND_M))
     wayplist.append(Waypoint(setpounce,  cfg.FINGER_OPEN_COMMAND_M))
-    epgraspwayps = end_pinch.plan_pull(X_RBped, cfg)
-    wayplist.append(Waypoint(epgraspwayps[0].X_RG@above, cfg.FINGER_OPEN_COMMAND_M))
-    return wayplist + epgraspwayps
+    return wayplist
+
+
+def plan_regrab(X_RB, cfg):
+    """Pick the block up off the pedestal by its ends (D-22): the same grasp end-pinch uses in the tower."""
+    
+    return end_pinch.plan_pull(X_RB, cfg)
 
 
 def plan_place(X_RT, cfg):

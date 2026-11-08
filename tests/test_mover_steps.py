@@ -50,7 +50,8 @@ class TestRealMoverSteps(unittest.TestCase):
         tower = TowerState(cfg)
         world, ex = FakeWorld(cfg, tower), FakeExecutor()
         plans = {name: mock.patch.object(method, name, return_value=["wp"])
-                 for name in ("plan_push", "plan_pull", "plan_regrab", "plan_place") if hasattr(method, name)}
+                 for name in ("plan_push", "plan_pull", "plan_ped_place", "plan_regrab", "plan_place")
+                 if hasattr(method, name)}
         with mock.patch.object(executor_api, "get", return_value=ex), \
                 mock.patch.object(method, "choose_place_station", return_value=place_station):
             for p in plans.values():
@@ -62,10 +63,11 @@ class TestRealMoverSteps(unittest.TestCase):
                     p.stop()
         return ex.log, info
 
-    def test_push_runs_push_pull_regrab_place_at_their_stations(self):
-        # block 1 (layer 0, middle) from station 0: push from 1 (nearest of 1 and 3), pull from 3, place from 1
+    def test_push_runs_push_pull_pedestal_regrab_place_at_their_stations(self):
+        # block 1 (layer 0, middle) from station 0: push from 1 (nearest of 1 and 3), pull from 3, set it on the
+        # pedestal and regrab it there (two plans, so each starts with a joint move), place from 1
         log, info = self.run_turn(make_cfg(EXTRACTION_METHOD="push"), push, 1, place_station=1)
-        self.assertEqual(log, [("base", 1), ("push", 1), ("base", 3), ("pull", 3), ("regrab", 3),
+        self.assertEqual(log, [("base", 1), ("push", 1), ("base", 3), ("pull", 3), ("pedestal", 3), ("regrab", 3),
                                ("base", 1), ("place", 1)])
         self.assertEqual((info.station_pull, info.station_place), (3, 1))
 

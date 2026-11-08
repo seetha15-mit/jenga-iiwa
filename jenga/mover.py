@@ -63,6 +63,10 @@ class RealMover:
             ex.move_base_to_station(world, k_pull)
             ex.run_plan(world, method.plan_pull(in_R(world.block_poses()[block_id]), cfg), cfg.WAYPOINT_SPEED_MS,
                         label="pull")
+            # ---- set it on a pedestal, then regrab it from where it actually landed (D-22); each is its own plan,
+            # so each starts with a joint move (this clears the hand's drift before the regrab grasp)
+            ex.run_plan(world, method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg), cfg.WAYPOINT_SPEED_MS,
+                        label="pedestal")
             ex.run_plan(world, method.plan_regrab(in_R(world.block_poses()[block_id]), cfg), cfg.WAYPOINT_SPEED_MS,
                         label="regrab")
         else:
