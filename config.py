@@ -76,7 +76,7 @@ ARM_CARRY_Q = (0.0, 0.4, 0.0, -1.6, 0.0, 1.2, 0.0)  # [measured] the psets' home
 # ------------------------------------------------------------------ physics
 CONTACT_MODEL = "hydroelastic"  # [estimate] "hydroelastic" or "point"; TODO compare (DECISIONS.md)
 CONTACT_APPROXIMATION = "lagged"  # [measured] "sap", "lagged", "similar" or "default" (Drake's own); with "sap" a pull dragged the layer above out with the block (Drake documents SAP 'gliding' in sliding contact), with "lagged" it came out cleanly (DECISIONS.md D-10)
-PLANT_TIME_STEP = 0.001  # [estimate] seconds per physics step; try 0.002 etc. when testing speed
+PLANT_TIME_STEP = 0.01  # [estimate] seconds per physics step; try 0.002 etc. when testing speed
 ARM_KP = (1.0e4, 1.0e4, 1.0e4, 1.0e4, 5.0e3, 3.0e3, 2.0e3)  # [estimate] arm joint stiffness (Nm/rad); the arm is gravity-compensated (see DECISIONS.md)
 ARM_KD = (500.0, 500.0, 300.0, 300.0, 100.0, 60.0, 40.0)  # [estimate] arm joint damping (Nm s/rad)
 FINGER_KP = 2000.0  # [estimate] finger stiffness (N/m): grip force = this x how far past the block the fingers are commanded
@@ -96,8 +96,8 @@ PLACE_TOLERANCE_M = 0.02  # [estimate] a block this close to its target slot cou
 PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pulled out
 
 # ------------------------------------------------------------------ replay and logs
-RECORD_REPLAY = True  # [user] record each trial for a normal-speed replay afterwards
-RUNS_DIR = "runs"  # [user] real results go here
+RECORD_REPLAY = False  # [user] record each trial for a normal-speed replay afterwards
+RUNS_DIR = "runs_scratch"  # [user] real results go here
 FAKE_RUNS_DIR = "runs_fake"  # [user] fake-mover runs go here, never into results
 ASSET_DIR = "generated_assets"  # [estimate] SDF files written at run time
 PRINT_SIM_SPEED = True  # [user] print simulated seconds per wall second
