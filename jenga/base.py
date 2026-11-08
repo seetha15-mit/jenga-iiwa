@@ -65,6 +65,22 @@ def near_edge_stations(tower, block_id: int):
     return out
 
 
+def push_stations(tower, block_id: int):
+    """Stations that face this block's END (short) face, so a push along its long axis slides it out
+    the far side.  Any slot works, including the middle; either end works."""
+    cfg = tower.cfg
+    rec = tower.blocks[block_id]
+    if rec.layer is None:  # a dropped/loose block is no longer in the tower
+        return []
+    across = tower.across_axis(rec.layer)
+    out = []
+    for k in range(len(cfg.STATION_ANGLES_DEG)):
+        c = float(across @ approach_dir(cfg, k))
+        if abs(c) < 1e-6:  # approach perpendicular to across  ->  approach along the long axis
+            out.append(k)
+    return out
+
+
 def nearest_station(cfg, candidates, current: int):
     """The candidate station with the smallest angle from the current one (shortest base move)."""
     ang = station_angles(cfg)

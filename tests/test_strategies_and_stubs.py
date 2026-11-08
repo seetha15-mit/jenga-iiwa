@@ -32,7 +32,11 @@ class TestStrategies(unittest.TestCase):
                 strategies.get_strategy(name)(t, [0], cfg, np.random.default_rng(0))
 
     def test_push_is_a_placeholder(self):
-        for fn, args in ((push.can_pull, (None, 0, None)), (push.plan_pull, (None, None))):
+        # only the station rules are written (can_pull, choose_station, choose_pull_station); the rest are stubs
+        stubs = ((push.can_place, (None, 0, 0, None)), (push.choose_place_station, (None, 0, 0, None, 0)),
+                 (push.plan_push, (None, None)), (push.plan_pull, (None, None)),
+                 (push.plan_regrab, (None, None)), (push.plan_place, (None, None)))
+        for fn, args in stubs:
             with self.assertRaises(NotImplementedError):
                 fn(*args)
 

@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from jenga import base, geometry as geo
-from jenga.methods import end_pinch, get_method
+from jenga.methods import end_pinch, get_method, push
 from jenga.tower import TowerState
 from tests.helpers import make_cfg
 
@@ -131,6 +131,44 @@ class TestEndPinchRules(unittest.TestCase):
         self.assertIs(get_method("end_pinch"), end_pinch)
         with self.assertRaises(ValueError):
             get_method("nope")
+
+
+class TestPushRules(unittest.TestCase):
+    def setUp(self):
+        self.cfg = make_cfg()
+        self.t = TowerState(self.cfg)
+
+    def angles(self, block_id):
+        return {self.cfg.STATION_ANGLES_DEG[k] for k in base.push_stations(self.t, block_id)}
+
+    def test_every_block_has_two_push_stations_middle_ones_too(self):
+        for bid in self.t.blocks:  # includes the middle blocks 1, 4, 7
+            self.assertEqual(len(base.push_stations(self.t, bid)), 2, f"block {bid}")
+            self.assertTrue(push.can_pull(self.t, bid, self.cfg))
+
+    def test_push_stations_face_the_block_ends(self):
+        # layer 0: long axis along world y, so the robot faces +y or -y; layer 1: long axis along x
+        for bid in (0, 1, 2, 6, 7, 8):
+            self.assertEqual(self.angles(bid), {90.0, 270.0}, f"block {bid}")
+        for bid in (3, 4, 5):
+            self.assertEqual(self.angles(bid), {0.0, 180.0}, f"block {bid}")
+
+    def test_a_loose_block_has_no_push_station(self):
+        self.t.mark_loose(4)
+        self.assertEqual(base.push_stations(self.t, 4), [])
+        self.assertFalse(push.can_pull(self.t, 4, self.cfg))
+
+    def test_push_choose_station_picks_the_nearer_end(self):
+        # block 1 (layer 0) can be pushed from station 1 (90 deg) or 3 (270 deg)
+        self.assertEqual(push.choose_station(self.t, 1, self.cfg, current_station=3), 3)
+        self.assertEqual(push.choose_station(self.t, 1, self.cfg, current_station=1), 1)
+        # block 4 (layer 1) from station 0 (0 deg) or 2 (180 deg); from station 2 it stays put
+        self.assertEqual(push.choose_station(self.t, 4, self.cfg, current_station=2), 2)
+
+    def test_pull_station_is_the_other_end(self):
+        self.assertEqual(push.choose_pull_station(self.t, 1, self.cfg, push_station=1), 3)
+        self.assertEqual(push.choose_pull_station(self.t, 1, self.cfg, push_station=3), 1)
+        self.assertEqual(push.choose_pull_station(self.t, 4, self.cfg, push_station=0), 2)
 
 
 if __name__ == "__main__":

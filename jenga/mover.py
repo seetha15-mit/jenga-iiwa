@@ -4,7 +4,8 @@ FakeMover  teleports the block to its target slot.  No arm, no physics for the m
            harness, logging, collapse detector and replay can be tested before the team's steps exist.
            Everything it produces is tagged mover = "fake" and goes to runs_fake/.  RESULTS ARE INVALID.
 RealMover  runs the team's steps: rolls the base to a station, executes the method's plan_pull, rolls to a
-           placing station if needed, and executes plan_place.
+           placing station if needed, and executes plan_place.  A method with a plan_push (the push method)
+           instead runs push, pull from the opposite station, regrab, then place.
 
 Both take a `world` (jenga.scene.Sim, or a stand-in with the same few methods in the tests).
 """
@@ -49,17 +50,33 @@ class RealMover:
         method = methods.get_method(cfg.EXTRACTION_METHOD)
         layer, slot = target
 
-        # ---- pull
-        k_pull = method.choose_station(tower, block_id, cfg, world.station)
-        ex.move_base_to_station(world, k_pull)
-        X_RB = RigidTransform(base.to_robot_frame(world.X_WR(), tower.block_pose(block_id)))
-        ex.run_plan(world, method.plan_pull(X_RB, cfg), cfg.WAYPOINT_SPEED_MS, label="pull")
+        def in_R(X_WB):  # a world pose in the robot frame, where the base stands NOW
+            return RigidTransform(base.to_robot_frame(world.X_WR(), X_WB))
+
+        if hasattr(method, "plan_push"):
+            # ---- push (push method): from one end, the block slides part way out the far side
+            ex.move_base_to_station(world, method.choose_station(tower, block_id, cfg, world.station))
+            ex.run_plan(world, method.plan_push(in_R(tower.block_pose(block_id)), cfg), cfg.WAYPOINT_SPEED_MS,
+                        label="push")
+            # ---- pull from the far end, then regrab; the block has moved, so its pose is read again
+            k_pull = method.choose_pull_station(tower, block_id, cfg, world.station)
+            ex.move_base_to_station(world, k_pull)
+            ex.run_plan(world, method.plan_pull(in_R(world.block_poses()[block_id]), cfg), cfg.WAYPOINT_SPEED_MS,
+                        label="pull")
+            ex.run_plan(world, method.plan_regrab(in_R(world.block_poses()[block_id]), cfg), cfg.WAYPOINT_SPEED_MS,
+                        label="regrab")
+        else:
+            # ---- pull
+            k_pull = method.choose_station(tower, block_id, cfg, world.station)
+            ex.move_base_to_station(world, k_pull)
+            ex.run_plan(world, method.plan_pull(in_R(tower.block_pose(block_id)), cfg), cfg.WAYPOINT_SPEED_MS,
+                        label="pull")
 
         # ---- place (the block stays in the hand while the base rolls)
         k_place = method.choose_place_station(tower, layer, slot, cfg, world.station)
         ex.move_base_to_station(world, k_place)
-        X_RT = RigidTransform(base.to_robot_frame(world.X_WR(), tower.target_pose(layer, slot)))
-        ex.run_plan(world, method.plan_place(X_RT, cfg), cfg.WAYPOINT_SPEED_MS, label="place")
+        ex.run_plan(world, method.plan_place(in_R(tower.target_pose(layer, slot)), cfg), cfg.WAYPOINT_SPEED_MS,
+                    label="place")
         return TurnInfo(k_pull, k_place)
 
 
