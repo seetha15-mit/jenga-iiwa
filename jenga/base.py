@@ -19,6 +19,14 @@ def station_angles(cfg):
     return [np.radians(a) for a in cfg.STATION_ANGLES_DEG]
 
 
+def pedestal_poses(cfg):
+    """(x, y, yaw) in the world of the four regrab pedestals: one on each diagonal between two stations,
+    PEDESTAL_DISTANCE_M from the tower centre, turned so a side faces the tower (D-22)."""
+    cx, cy = cfg.TOWER_CENTER_XY
+    r = cfg.PEDESTAL_DISTANCE_M
+    return [(cx + r * np.cos(a), cy + r * np.sin(a), a) for a in np.radians([45.0, 135.0, 225.0, 315.0])]
+
+
 def approach_dir(cfg, k: int) -> np.ndarray:
     """Unit vector (world, horizontal) the robot at station k faces."""
     th = station_angles(cfg)[k]

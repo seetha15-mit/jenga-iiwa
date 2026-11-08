@@ -104,6 +104,21 @@ class TestBase(unittest.TestCase):
         self.assertEqual(base.nearest_station(self.cfg, [1, 3], 0), 1)
         self.assertEqual(base.nearest_station(self.cfg, [0, 2], 3), 0)
 
+    def test_pedestals_sit_on_the_diagonals_clear_of_tower_axes_and_base(self):
+        poses = base.pedestal_poses(self.cfg)
+        self.assertEqual(len(poses), 4)
+        cx, cy = self.cfg.TOWER_CENTER_XY
+        half_top = self.cfg.PEDESTAL_TOP_M / 2 * np.sqrt(2)  # worst case: a corner of the square top
+        for x, y, _ in poses:
+            dx, dy = x - cx, y - cy
+            self.assertAlmostEqual(np.hypot(dx, dy), self.cfg.PEDESTAL_DISTANCE_M)
+            self.assertAlmostEqual(abs(dx), abs(dy))  # on a diagonal, between two stations
+            # off every station axis by more than the push hand reaches sideways (about 0.163 m, D-22)
+            self.assertGreater(min(abs(dx), abs(dy)) - half_top, 0.163)
+            # well inside where the base plate (0.45 m square) stops at a station
+            self.assertLess(np.hypot(dx, dy) + half_top, self.cfg.STATION_STANDOFF_M - 0.225)
+        self.assertLess(self.cfg.PEDESTAL_HEIGHT_M, self.cfg.PLATFORM_HEIGHT_M)  # below layer 0's hand
+
 
 class TestEndPinchRules(unittest.TestCase):
     def setUp(self):

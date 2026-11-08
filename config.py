@@ -56,6 +56,11 @@ PLATFORM_MARGIN_M = 0.0  # [estimate] platform sticks out this far past the towe
 FIRST_LAYER_LONG_AXIS = "y"  # [user] layer 0 blocks lie along world y; layers alternate
 TABLE_SIZE_M = (2.5, 2.5, 0.05)  # [estimate] table top is at z = 0
 TABLE_FRICTION = 0.5  # [estimate]
+# regrab pedestals (push method): four posts on the diagonals between stations, where a pulled block is set down
+# and picked up again by its ends with a level hand (DECISIONS.md D-22)
+PEDESTAL_DISTANCE_M = 0.27  # [derived] tower centre to post centre along a diagonal; IK-only: 29 deg worst joint margin
+PEDESTAL_HEIGHT_M = 0.07  # [derived] top above the table: 16 mm under the lowest hand body near the tower (layer 0)
+PEDESTAL_TOP_M = 0.03  # [derived] square top, narrower than a block (36 mm) so the fingers pass beside it
 
 # ------------------------------------------------------------------ robot base and stations
 BASE_MODE = "mobile"  # [user] "mobile" (rolling base) or "fixed" (welded at station 0; isolates base problems)

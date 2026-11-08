@@ -41,6 +41,7 @@ from pydrake.all import (
     PdControllerGains,
     RigidTransform,
     RollPitchYaw,
+    RotationMatrix,
     Simulator,
 )
 
@@ -238,6 +239,9 @@ class Sim:
                                    cfg.TABLE_FRICTION, cfg),
             "platform": write_box_sdf(d / "platform.sdf", "platform", (fp, fp, cfg.PLATFORM_HEIGHT_M),
                                       (0.40, 0.40, 0.45), 20.0, cfg.TABLE_FRICTION, cfg),
+            "pedestals": [write_box_sdf(d / f"pedestal_{i}.sdf", f"pedestal_{i}",
+                                        (cfg.PEDESTAL_TOP_M, cfg.PEDESTAL_TOP_M, cfg.PEDESTAL_HEIGHT_M),
+                                        (0.40, 0.40, 0.45), 1.0, cfg.TABLE_FRICTION, cfg) for i in range(4)],
             "base": write_base_sdf(d / "base.sdf") if self.mobile else None,
             "blocks": {},
         }
@@ -281,6 +285,9 @@ class Sim:
         plant.WeldFrames(plant.world_frame(), plant.GetFrameByName(BOX_BODY, table),
                          RigidTransform([0.0, 0.0, -cfg.TABLE_SIZE_M[2]]))
         plant.WeldFrames(plant.world_frame(), plant.GetFrameByName(BOX_BODY, platform), RigidTransform([cx, cy, 0.0]))
+        for path, (x, y, yaw) in zip(assets["pedestals"], base_mod.pedestal_poses(cfg)):  # regrab posts (D-22)
+            plant.WeldFrames(plant.world_frame(), plant.GetFrameByName(BOX_BODY, add_text(path)),
+                             RigidTransform(RotationMatrix.MakeZRotation(yaw), [x, y, 0.0]))
 
         # ---- physics settings (before Finalize)
         if cfg.CONTACT_MODEL == "point":
