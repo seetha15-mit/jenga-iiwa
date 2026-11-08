@@ -68,8 +68,6 @@ def check_values(cfg) -> list:
         w.append("BASE_TRAVEL_RADIUS_M is smaller than STATION_STANDOFF_M: the base would roll through the tower.")
     if len(cfg.STATION_ANGLES_DEG) < 1:
         w.append("STATION_ANGLES_DEG needs at least one station.")
-    if cfg.EXTRACTION_METHOD == "push":
-        w.append("EXTRACTION_METHOD = 'push' is not implemented (placeholder).")
     if cfg.MOVER == "fake":
         w.append("MOVER = 'fake': runs use the teleport placeholder and are INVALID for results (this is the default until the team's steps exist).")
     return w

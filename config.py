@@ -22,7 +22,7 @@ MAX_TURNS = 10  # [estimate] a trial ends after this many turns even without a c
 MAX_CONSECUTIVE_FAILURES = 2  # [estimate] a trial ends after this many failed turns in a row
 START_SETTLE_S = 1.0  # [estimate] the tower stands this long before the first turn, so a replay opens on the intact tower
 MOVER = "fake"  # [user] "fake" = teleport placeholder (results INVALID), "real" = the team's steps
-EXTRACTION_METHOD = "end_pinch"  # [user] "end_pinch" (default) or "push" (stub, not implemented)
+EXTRACTION_METHOD = "end_pinch"  # [user] "end_pinch" (default) or "push" (push, pull, pedestal regrab, place; D-21)
 STRATEGY = "random"  # [course] "random", "rule_based", "perception", "force_guided"
 COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 

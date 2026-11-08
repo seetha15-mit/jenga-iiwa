@@ -1,20 +1,20 @@
-"""PUSH method (possibly with a push tool).  Only the station rules are written.
+"""PUSH method: push a block part way out with the fingertips, pull it from the other side, set it on a
+pedestal, pick it up by its ends and place it on top (DECISIONS.md D-21, D-22, O-5).
 
 The robot faces a block's SHORT end face and pushes along the block's long axis, so the block slides out
 the far side.  Any slot works (the middle too) and either end works (base.push_stations).
 
-A turn has four steps, in this order (jenga/mover.py RealMover runs them):
-    plan_push     at the push station (choose_station): push the block part way out the far side
-    plan_pull     at the OPPOSITE station (choose_pull_station): grasp the end that sticks out, pull it clear
-    plan_regrab   at the same station: change the grasp so the block can be placed on top
-    plan_place    at the place station (choose_place_station): carry, lower, release
-The base rolls between the stations with the arm in its carry pose, so the hand is empty while it rolls
-from push to pull.
+A turn has five steps, in this order (jenga/mover.py RealMover runs them, each starting with a joint move):
+    plan_push       at the push station (choose_station): push the block 0.4 L out the far side
+    plan_pull       at the OPPOSITE station (choose_pull_station): grip the end that sticks out, pull it clear
+    plan_ped_place  at the same station: set it on the pedestal on the robot's left (D-22)
+    plan_regrab     at the same station: pick it up level by its ends (end_pinch.plan_pull)
+    plan_place      at the place station (choose_place_station): carry, lower, release (end_pinch.plan_place)
+The base rolls between the stations with the arm in its carry pose.
 
-WRITTEN:      can_pull, choose_station, choose_pull_station (which blocks can be pushed, and from where).
-PLACEHOLDERS: can_place, choose_place_station, plan_push, plan_pull, plan_regrab, plan_place.  The tool,
-              the tolerances, how far to push, and how the block is regrabbed and placed are undecided
-              (DECISIONS.md O-5).  Plans return lists of Waypoint, as in jenga/methods/end_pinch.py.
+Rules (which blocks, which stations) were written with Claude; the plans are Katie's.  Measured status and
+limits (tuned on block 1; needs two or more layers above the pulled block) are in DECISIONS.md O-5.
+Plans return lists of Waypoint, as in jenga/methods/end_pinch.py.
 """
 import numpy as np
 from jenga import base
@@ -22,7 +22,6 @@ from jenga import geometry as geo
 from jenga.waypoint import Waypoint
 from jenga.methods import end_pinch
 
-_MSG = "This part of the push method is not implemented yet (decided later; see DECISIONS.md O-5)."
 
 
 # ====================================================================== rules (written)

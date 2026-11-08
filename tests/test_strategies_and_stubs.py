@@ -31,14 +31,19 @@ class TestStrategies(unittest.TestCase):
             with self.assertRaises(NotImplementedError):
                 strategies.get_strategy(name)(t, [0], cfg, np.random.default_rng(0))
 
-    def test_push_is_a_placeholder(self):
-        # only the station rules are written (can_pull, choose_station, choose_pull_station); the rest are stubs
-        stubs = ((push.can_place, (None, 0, 0, None)), (push.choose_place_station, (None, 0, 0, None, 0)),
-                 (push.plan_push, (None, None)), (push.plan_pull, (None, None)),
-                 (push.plan_regrab, (None, None)), (push.plan_place, (None, None)))
-        for fn, args in stubs:
-            with self.assertRaises(NotImplementedError):
-                fn(*args)
+    def test_push_places_like_end_pinch(self):
+        # after the regrab the block is held end-pinch, so push uses end-pinch's place rules (D-21, D-22)
+        cfg, t = make_cfg(), TowerState(make_cfg())
+        for layer, slot in t.placement_slots():
+            self.assertEqual(push.can_place(t, layer, slot, cfg), end_pinch.can_place(t, layer, slot, cfg))
+            for k in range(len(cfg.STATION_ANGLES_DEG)):
+                self.assertEqual(push.choose_place_station(t, layer, slot, cfg, k),
+                                 end_pinch.choose_place_station(t, layer, slot, cfg, k))
+
+    def test_push_has_all_five_steps(self):
+        # RealMover runs these in order for a push turn (D-21); the waypoints themselves are checked in Drake
+        for name in ("plan_push", "plan_pull", "plan_ped_place", "plan_regrab", "plan_place"):
+            self.assertTrue(callable(getattr(push, name, None)), name)
 
     def test_unknown_strategy(self):
         with self.assertRaises(ValueError):
