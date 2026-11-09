@@ -13,11 +13,12 @@ ap.add_argument("--strategy", required=True)
 ap.add_argument("--trial", type=int, required=True)
 ap.add_argument("--mover", default="real", choices=["fake", "real"])
 ap.add_argument("--turns", type=int)
+ap.add_argument("--replay", action="store_true")
 ap.add_argument("--out-root", required=True)
 a = ap.parse_args()
 
 cfg = SimpleNamespace(**{k: v for k, v in vars(_config).items() if k.isupper()})
-cfg.STRATEGY, cfg.MOVER, cfg.RECORD_REPLAY = a.strategy, a.mover, False
+cfg.STRATEGY, cfg.MOVER, cfg.RECORD_REPLAY = a.strategy, a.mover, a.replay
 if a.turns:
     cfg.MAX_TURNS = a.turns
 
