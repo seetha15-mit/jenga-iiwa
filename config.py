@@ -29,6 +29,7 @@ COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 # ------------------------------------------------------------------ blocks
 BLOCK_REAL_M = (0.075, 0.025, 0.015)  # [course] a real Jenga block: length, width, height
 BLOCK_SCALE = 1.45  # [user] ONE scale for all three dimensions (decided from the gripper numbers)
+BLOCK_COLORS = "colored"  # [user] "colored" (3 colours per layer by slot, another 3 on odd layers; for perception) or "wood"
 BLOCK_GAP_M = 0.0005  # [estimate] gap between neighbouring blocks (prototype value, not verified)
 BLOCK_DENSITY = 700.0  # [estimate] kg/m^3; gives about 0.06 kg per block at this scale
 FRICTION_MODE = "global"  # [user] "global" (all equal) or "random" (varied, hidden from strategies)

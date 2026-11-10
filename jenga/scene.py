@@ -247,8 +247,8 @@ class Sim:
         }
         mass = geo.block_mass(cfg)
         for bid in self.block_ids:
-            color = (0.80, 0.62, 0.40) if (bid // 3) % 2 == 0 else (0.68, 0.50, 0.30)
-            assets["blocks"][bid] = write_box_sdf(d / f"block_{bid:02d}.sdf", f"block_{bid:02d}", (L, W, H), color,
+            assets["blocks"][bid] = write_box_sdf(d / f"block_{bid:02d}.sdf", f"block_{bid:02d}", (L, W, H),
+                                                  geo.block_color(cfg, bid),
                                                   mass, self._friction[bid], cfg)
         return assets
 

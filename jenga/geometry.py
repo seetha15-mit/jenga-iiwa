@@ -128,3 +128,20 @@ def housing_overlap(cfg, slot_offset_m: float):
 def housing_collides(cfg, slot_offset_m: float) -> bool:
     overlap, dip = housing_overlap(cfg, slot_offset_m)
     return overlap > 0 and dip > 0
+
+
+# "colored": one colour per slot, a different set of three on odd layers, so every pair of touching blocks
+# differs (slot neighbours touch; each block crosses all three of the layers above and below).  Hues 60 deg apart.
+COLORED_EVEN = ((0.85, 0.15, 0.15), (0.15, 0.70, 0.20), (0.15, 0.30, 0.85))  # red, green, blue
+COLORED_ODD = ((0.90, 0.80, 0.10), (0.10, 0.75, 0.80), (0.80, 0.20, 0.75))   # yellow, cyan, magenta
+WOOD = ((0.80, 0.62, 0.40), (0.68, 0.50, 0.30))                               # light, dark by layer
+
+
+def block_color(cfg, block_id: int) -> tuple:
+    """RGB of a block from its STARTING layer and slot (block_id = 3 * layer + slot), for any number of layers.
+    cfg.BLOCK_COLORS: "colored" (see above, to help a future perception strategy) or "wood" (two tones by layer).
+    The colour stays with the block when it is moved, so the pattern holds only for the starting tower."""
+    layer, slot = divmod(block_id, 3)
+    if cfg.BLOCK_COLORS == "wood":
+        return WOOD[layer % 2]
+    return (COLORED_EVEN if layer % 2 == 0 else COLORED_ODD)[slot]

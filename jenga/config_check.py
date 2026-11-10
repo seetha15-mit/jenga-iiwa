@@ -32,7 +32,7 @@ def check_values(cfg) -> list:
         "COLLAPSE_DETECTOR": ("basic", "advanced"), "BASE_MODE": ("mobile", "fixed"),
         "CONTACT_MODEL": ("hydroelastic", "point"), "FRICTION_MODE": ("global", "random"),
         "CONTACT_APPROXIMATION": ("sap", "lagged", "similar", "default"),
-        "FIRST_LAYER_LONG_AXIS": ("x", "y"),
+        "FIRST_LAYER_LONG_AXIS": ("x", "y"), "BLOCK_COLORS": ("colored", "wood"),
     }
     for name, allowed in choices.items():
         if getattr(cfg, name) not in allowed:
