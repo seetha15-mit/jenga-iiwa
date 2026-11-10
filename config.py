@@ -96,7 +96,7 @@ PLACE_TOLERANCE_M = 0.02  # [estimate] a block this close to its target slot cou
 PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pulled out
 
 # ------------------------------------------------------------------ replay and logs
-RECORD_REPLAY = False  # [user] record each trial for a normal-speed replay afterwards
+RECORD_REPLAY = True  # [user] record each trial for a normal-speed replay afterwards
 RUNS_DIR = "runs_scratch"  # [user] real results go here
 FAKE_RUNS_DIR = "runs_fake"  # [user] fake-mover runs go here, never into results
 ASSET_DIR = "generated_assets"  # [estimate] SDF files written at run time
