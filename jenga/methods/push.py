@@ -108,17 +108,24 @@ def plan_ped_place(X_RB, cfg):
     L,W,H = geo.block_dims(cfg)
     d = cfg.PEDESTAL_DISTANCE_M / np.sqrt(2)
     R_RBped = RotationMatrix.MakeZRotation(-np.pi/4)
-    X_RBped = RigidTransform(R_RBped,[cfg.STATION_STANDOFF_M - d, d, cfg.PEDESTAL_HEIGHT_M + 0.001])
+    # Release 2 mm BELOW the post top with a +1 mm target
+    X_RBped = RigidTransform(R_RBped,[cfg.STATION_STANDOFF_M - d, d, cfg.PEDESTAL_HEIGHT_M - 0.002])
     R_BG = RotationMatrix.MakeXRotation(np.radians(-180))@RotationMatrix.MakeZRotation(np.radians(-90))
     X_BG = RigidTransform(R_BG,[-L/2-cfg.FINGERTIP_REACH_M+L/5,0,0.5*H])
     setpoint = X_RBped @ X_BG
     above = RigidTransform([0, 0, -0.05])
     setpounce = setpoint@above
+    grip = W-1.75*cfg.FINGER_SQUEEZE_M
+    touch = W - 0.005                                # pad gap = opening + 5 mm, so this is pads just touching
+    # Release the squeeze fully on a still leg then open in steps, and lift only once open
     wayplist = []
-    wayplist.append(Waypoint(setpounce,  W-1.75*cfg.FINGER_SQUEEZE_M))
-    wayplist.append(Waypoint(setpoint,  W-1.75*cfg.FINGER_SQUEEZE_M))
-    wayplist.append(Waypoint(setpoint,  cfg.FINGER_OPEN_COMMAND_M))
-    wayplist.append(Waypoint(setpounce,  cfg.FINGER_OPEN_COMMAND_M))
+    wayplist.append(Waypoint(setpounce, grip))
+    wayplist.append(Waypoint(setpoint,  grip))
+    wayplist.append(Waypoint(setpoint,  touch + 0.002))                      # relax: pads ~1 mm clear each side
+    wayplist.append(Waypoint(setpoint,  touch + 0.010, 0.75))                # still: squeeze released, block on post
+    wayplist.append(Waypoint(setpoint,  cfg.FINGER_OPEN_COMMAND_M, 0.5))     # still: small opening
+    wayplist.append(Waypoint(setpoint,  cfg.FINGER_OPEN_COMMAND_M, 0.5))     # still: full open
+    wayplist.append(Waypoint(setpounce, cfg.FINGER_OPEN_COMMAND_M))          # only now lift
     return wayplist
 
 

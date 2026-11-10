@@ -8,3 +8,7 @@ __pycache__/
 *.pyc
 .venv/
 scratch/
+runs_scratch/*
+jenga.sif
+logs/*
+!logs/.gitkeep

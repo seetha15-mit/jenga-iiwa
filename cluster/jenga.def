@@ -1,0 +1,12 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+%post
+    apt-get update
+    apt-get install -y --no-install-recommends python3 python3-venv python3-pip ca-certificates libgl1 libglu1-mesa libx11-6 libsm6 libglib2.0-0t64
+    python3 -m venv /opt/venv
+    /opt/venv/bin/pip install drake==1.57.0 "manipulation[letter]" scipy rtree
+
+%environment
+    export PATH=/opt/venv/bin:$PATH
+    export PYTHONNOUSERSITE=1

@@ -123,6 +123,9 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
         except MotionFailed as e:  # a motion could not be done: logged as a failed turn
             mover_error = str(e)
         after = world.block_poses()
+        others = max(float(np.linalg.norm(after[b][:3, 3] - before[b][:3, 3])) for b in before if b != block)
+        place_err = float(np.linalg.norm(after[block][:3, 3] - tower.target_pose(*target)[:3, 3]))
+        log(f"   [check] other blocks moved at most {others * 1000:.2f} mm; placed block {place_err * 1000:.1f} mm from its slot")
         turns += 1
 
         outcome = outcomes.classify_turn(before[block], after[block], tower.target_pose(*target), cfg)

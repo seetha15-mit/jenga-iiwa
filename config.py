@@ -66,8 +66,8 @@ PEDESTAL_TOP_M = 0.03  # [derived] square top, narrower than a block (36 mm) so 
 BASE_MODE = "mobile"  # [user] "mobile" (rolling base) or "fixed" (welded at station 0; isolates base problems)
 STATION_ANGLES_DEG = (0.0, 90.0, 180.0, 270.0)  # [estimate] directions the robot faces the tower from
 STATION_STANDOFF_M = 0.95  # [user] base axis to tower centre; the reachability check passed 0.90 to 1.00 m with 16 to 31 deg margin
-BASE_TRAVEL_RADIUS_M = 1.2  # [estimate] the base circles the tower at this distance between stations
-BASE_SPEED_MS = 0.4  # [estimate] rolling speed
+BASE_TRAVEL_RADIUS_M = 0.95  # [estimate] the base circles the tower at this distance between stations
+BASE_SPEED_MS = 0.8  # [estimate] rolling speed
 BASE_MOUNT_HEIGHT_M = 0.0  # [estimate] height of the arm's mounting flange above the table
 BASE_KP = (1.0e5, 1.0e5, 2.0e4)  # [estimate] base stiffness for x, y, yaw (N/m, N/m, Nm/rad)
 BASE_KD = (2.0e3, 2.0e3, 5.0e2)  # [estimate] base damping for x, y, yaw
@@ -76,7 +76,7 @@ ARM_CARRY_Q = (0.0, 0.4, 0.0, -1.6, 0.0, 1.2, 0.0)  # [measured] the psets' home
 # ------------------------------------------------------------------ physics
 CONTACT_MODEL = "hydroelastic"  # [estimate] "hydroelastic" or "point"; TODO compare (DECISIONS.md)
 CONTACT_APPROXIMATION = "lagged"  # [measured] "sap", "lagged", "similar" or "default" (Drake's own); with "sap" a pull dragged the layer above out with the block (Drake documents SAP 'gliding' in sliding contact), with "lagged" it came out cleanly (DECISIONS.md D-10)
-PLANT_TIME_STEP = 0.001  # [estimate] seconds per physics step; try 0.002 etc. when testing speed
+PLANT_TIME_STEP = 0.005  # [estimate] seconds per physics step; try 0.002 etc. when testing speed
 ARM_KP = (1.0e4, 1.0e4, 1.0e4, 1.0e4, 5.0e3, 3.0e3, 2.0e3)  # [estimate] arm joint stiffness (Nm/rad); the arm is gravity-compensated (see DECISIONS.md)
 ARM_KD = (500.0, 500.0, 300.0, 300.0, 100.0, 60.0, 40.0)  # [estimate] arm joint damping (Nm s/rad)
 FINGER_KP = 2000.0  # [estimate] finger stiffness (N/m): grip force = this x how far past the block the fingers are commanded
@@ -97,7 +97,7 @@ PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pull
 
 # ------------------------------------------------------------------ replay and logs
 RECORD_REPLAY = True  # [user] record each trial for a normal-speed replay afterwards
-RUNS_DIR = "runs"  # [user] real results go here
+RUNS_DIR = "runs_scratch"  # [user] real results go here
 FAKE_RUNS_DIR = "runs_fake"  # [user] fake-mover runs go here, never into results
 ASSET_DIR = "generated_assets"  # [estimate] SDF files written at run time
 PRINT_SIM_SPEED = True  # [user] print simulated seconds per wall second
