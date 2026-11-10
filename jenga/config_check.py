@@ -54,8 +54,11 @@ def check_values(cfg) -> list:
         w.append("FINGER_OPEN_COMMAND_M is above the gripper's 110 mm maximum.")
     if geo.block_mass(cfg) > 0.1:
         w.append(f"Block mass {geo.block_mass(cfg):.3f} kg is above the 0.1 kg the psets hold (estimate).")
-    if len(cfg.ARM_KP) != 7 or len(cfg.ARM_KD) != 7 or len(cfg.BASE_KP) != 3 or len(cfg.BASE_KD) != 3:
-        w.append("ARM_KP/ARM_KD need 7 entries and BASE_KP/BASE_KD need 3.")
+    #added mlg 11/10
+    if len(cfg.ARM_KP) != 7 or len(cfg.ARM_KD) != 7:
+        w.append("ARM_KP/ARM_KD need 7 entries.")
+    # if len(cfg.ARM_KP) != 7 or len(cfg.ARM_KD) != 7 or len(cfg.BASE_KP) != 3 or len(cfg.BASE_KD) != 3:
+    #     w.append("ARM_KP/ARM_KD need 7 entries and BASE_KP/BASE_KD need 3.")
     if cfg.PLANT_TIME_STEP is None or cfg.PLANT_TIME_STEP <= 0:
         w.append("PLANT_TIME_STEP must be a positive number (the plant is built by hand and needs one).")
     if cfg.N_LAYERS_START < 2:

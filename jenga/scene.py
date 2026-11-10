@@ -59,7 +59,7 @@ from jenga.controller import (
 from jenga.kinematics import RobotKinematics
 from utils.drake_models import explain_model_download_error
 
-BASE_JOINTS = ("base_x", "base_y", "base_yaw")
+BASE_JOINTS = ("base_yaw",) #("base_x", "base_y", "base_yaw")
 BOX_BODY = "base_link"  # name of the single body in every box SDF
 IIWA_URL = "package://drake_models/iiwa_description/sdf/iiwa7_no_collision.sdf"
 WSG_URL = "package://manipulation/hydro/schunk_wsg_50_with_tip.sdf"
@@ -119,33 +119,57 @@ def write_box_sdf(path: Path, name, size, rgb, mass, mu, cfg) -> Path:
     )
     return Path(path)
 
-
-def write_base_sdf(path: Path) -> Path:
-    """The rolling base: x and y slides and a yaw joint carrying a thin visual-only plate (no collision).
-    The arm is welded to `base_link`.  Joints have effort limits so Drake makes them actuated."""
-
-    def link(name, mass, visual=""):
-        i = mass * 0.05
-        return (f'<link name="{name}"><inertial><mass>{mass}</mass><inertia><ixx>{i}</ixx><ixy>0</ixy><ixz>0</ixz>'
-                f"<iyy>{i}</iyy><iyz>0</iyz><izz>{i}</izz></inertia></inertial>{visual}</link>")
-
+def write_base_sdf(path: Path, cfg) -> Path:
+    """The turntable base: ONE revolute joint about the vertical axis through the tower centre.
+    base_link sits STATION_STANDOFF_M behind the tower centre; the joint's <pose> (relative to base_link)
+    puts the joint frame, and so the rotation axis, at the tower centre.  The joint angle is the robot's yaw,
+    the same angle as base.base_xy_yaw.  The arm is welded to `base_link`; the plate is visual only.
+    The joint has an effort limit so Drake makes it actuated."""
+    
+    cx, cy = cfg.TOWER_CENTER_XY
+    r = cfg.STATION_STANDOFF_M
     plate = ('<visual name="plate"><pose>0 0 0.005 0 0 0</pose><geometry><box><size>0.45 0.45 0.01</size></box>'
              "</geometry><material><diffuse>0.25 0.27 0.32 1</diffuse></material></visual>")
-
-    def joint(name, kind, parent, child, axis, lim):
-        return (f'<joint name="{name}" type="{kind}"><parent>{parent}</parent><child>{child}</child><axis>'
-                f"<xyz>{axis}</xyz><limit><lower>-{lim}</lower><upper>{lim}</upper><effort>2000</effort></limit>"
-                "</axis></joint>")
-
+    
     Path(path).write_text(
         '<?xml version="1.0"?>\n<sdf version="1.7">\n  <model name="base">\n    '
-        + link("slide_x", 5.0) + link("slide_y", 5.0) + link("base_link", 40.0, plate)
-        + joint("base_x", "prismatic", "world", "slide_x", "1 0 0", 10)
-        + joint("base_y", "prismatic", "slide_x", "slide_y", "0 1 0", 10)
-        + joint("base_yaw", "revolute", "slide_y", "base_link", "0 0 1", 100)
-        + "\n  </model>\n</sdf>\n"
+        f'<link name="base_link"><pose>{cx - r} {cy} 0 0 0 0</pose><inertial><mass>40.0</mass><inertia>'
+        "<ixx>2.0</ixx><ixy>0</ixy><ixz>0</ixz><iyy>2.0</iyy><iyz>0</iyz><izz>2.0</izz></inertia></inertial>"
+        f"{plate}</link>"
+        f'<joint name="base_yaw" type="revolute"><pose>{r} 0 0 0 0 0</pose><parent>world</parent>'
+        "<child>base_link</child><axis><xyz>0 0 1</xyz>"
+        "<limit><lower>-100</lower><upper>100</upper><effort>2000</effort></limit></axis></joint>"
+        "\n  </model>\n</sdf>\n"
     )
+
     return Path(path)
+
+# def write_base_sdf(path: Path) -> Path:
+#     """The rolling base: x and y slides and a yaw joint carrying a thin visual-only plate (no collision).
+#     The arm is welded to `base_link`.  Joints have effort limits so Drake makes them actuated."""
+
+#     def link(name, mass, visual=""):
+#         i = mass * 0.05
+#         return (f'<link name="{name}"><inertial><mass>{mass}</mass><inertia><ixx>{i}</ixx><ixy>0</ixy><ixz>0</ixz>'
+#                 f"<iyy>{i}</iyy><iyz>0</iyz><izz>{i}</izz></inertia></inertial>{visual}</link>")
+
+#     plate = ('<visual name="plate"><pose>0 0 0.005 0 0 0</pose><geometry><box><size>0.45 0.45 0.01</size></box>'
+#              "</geometry><material><diffuse>0.25 0.27 0.32 1</diffuse></material></visual>")
+
+#     def joint(name, kind, parent, child, axis, lim):
+#         return (f'<joint name="{name}" type="{kind}"><parent>{parent}</parent><child>{child}</child><axis>'
+#                 f"<xyz>{axis}</xyz><limit><lower>-{lim}</lower><upper>{lim}</upper><effort>2000</effort></limit>"
+#                 "</axis></joint>")
+
+#     Path(path).write_text(
+#         '<?xml version="1.0"?>\n<sdf version="1.7">\n  <model name="base">\n    '
+#         + link("slide_x", 5.0) + link("slide_y", 5.0) + link("base_link", 40.0, plate)
+#         + joint("base_x", "prismatic", "world", "slide_x", "1 0 0", 10)
+#         + joint("base_y", "prismatic", "slide_x", "slide_y", "0 1 0", 10)
+#         + joint("base_yaw", "revolute", "slide_y", "base_link", "0 0 1", 100)
+#         + "\n  </model>\n</sdf>\n"
+#     )
+#     return Path(path)
 
 
 def api_hint(obj, *words) -> str:
@@ -215,7 +239,7 @@ class Sim:
         # ---- the rolling base
         self.base_cmd = None
         if self.mobile:
-            self.base_cmd = builder.AddSystem(BaseCommand(base_mod.base_xy_yaw(cfg, 0)))
+            self.base_cmd = builder.AddSystem(BaseCommand(base_mod.station_angles(cfg)[0]))
             builder.Connect(self.base_cmd.get_output_port(), self._desired_state_port(self.base, "base"))
 
         if self.meshcat is not None:
@@ -242,7 +266,7 @@ class Sim:
             "pedestals": [write_box_sdf(d / f"pedestal_{i}.sdf", f"pedestal_{i}",
                                         (cfg.PEDESTAL_TOP_M, cfg.PEDESTAL_TOP_M, cfg.PEDESTAL_HEIGHT_M),
                                         (0.40, 0.40, 0.45), 1.0, cfg.TABLE_FRICTION, cfg) for i in range(4)],
-            "base": write_base_sdf(d / "base.sdf") if self.mobile else None,
+            "base": write_base_sdf(d / "base.sdf", cfg) if self.mobile else None,
             "blocks": {},
         }
         mass = geo.block_mass(cfg)
@@ -301,7 +325,7 @@ class Sim:
         self._set_gains(self.iiwa, IIWA_JOINTS, cfg.ARM_KP, cfg.ARM_KD, "arm")
         self._set_gains(self.wsg, WSG_JOINTS, [cfg.FINGER_KP] * 2, [cfg.FINGER_KD] * 2, "gripper")
         if self.mobile:
-            self._set_gains(self.base, BASE_JOINTS, cfg.BASE_KP, cfg.BASE_KD, "base")
+            self._set_gains(self.base, BASE_JOINTS, [cfg.BASE_KP], [cfg.BASE_KD], "base")
 
         plant.Finalize()
 
@@ -309,7 +333,7 @@ class Sim:
         plant.SetDefaultPositions(self.iiwa, np.array(cfg.ARM_CARRY_Q, float))
         plant.SetDefaultPositions(self.wsg, [-cfg.FINGER_OPEN_COMMAND_M / 2, cfg.FINGER_OPEN_COMMAND_M / 2])
         if self.mobile:
-            plant.SetDefaultPositions(self.base, np.array(base_mod.base_xy_yaw(cfg, 0), float))
+            plant.SetDefaultPositions(self.base, np.array([base_mod.station_angles(cfg)[0]], float))
         for bid, inst in blocks.items():
             plant.SetDefaultPositions(inst, geo.free_body_q(tower.blocks[bid].X_WB))
 
@@ -377,8 +401,12 @@ class Sim:
         """(x, y, yaw) of the base (yaw is unwrapped)."""
         if not self.mobile:
             return base_mod.base_xy_yaw(self.cfg, 0)
-        return tuple(float(v) for v in self.plant.GetPositions(self._pc(), self.base))
-
+        #return tuple(float(v) for v in self.plant.GetPositions(self._pc(), self.base))
+        yaw = float(self.plant.GetPositions(self._pc(), self.base)[0])
+        cx, cy = self.cfg.TOWER_CENTER_XY
+        r = self.cfg.STATION_STANDOFF_M
+        return (cx - r * np.cos(yaw), cy - r * np.sin(yaw), yaw)
+    
     def X_WR(self) -> np.ndarray:
         """Pose of the robot base frame (arm mounting flange) in the world, from the simulator."""
         body = self.plant.GetBodyByName("iiwa_link_0", self.iiwa)
@@ -433,7 +461,7 @@ class Sim:
         self.player.start_joint(np.asarray(q_target) - np.asarray(q_now), T, opening, self.time())
 
     def set_base_target(self, x, y, yaw) -> None:
-        self.base_cmd.set(x, y, yaw)
+        self.base_cmd.set(yaw)  # the turntable only turns; x and y follow from the yaw
 
     def advance_logged(self, seconds: float) -> None:
         """Advance, sampling the wrist force every SAMPLE_DT_S when config.ENABLE_WRIST_FORCE_LOG is on."""

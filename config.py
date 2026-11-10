@@ -69,8 +69,8 @@ STATION_STANDOFF_M = 0.95  # [user] base axis to tower centre; the reachability 
 BASE_TRAVEL_RADIUS_M = 0.95  # [estimate] the base circles the tower at this distance between stations
 BASE_SPEED_MS = 0.8  # [estimate] rolling speed
 BASE_MOUNT_HEIGHT_M = 0.0  # [estimate] height of the arm's mounting flange above the table
-BASE_KP = (1.0e5, 1.0e5, 2.0e4)  # [estimate] base stiffness for x, y, yaw (N/m, N/m, Nm/rad)
-BASE_KD = (2.0e3, 2.0e3, 5.0e2)  # [estimate] base damping for x, y, yaw
+BASE_KP = 9.0e4  # [derived] turntable stiffness (Nm/rad): the old 1.0e5 N/m x STATION_STANDOFF_M^2   #changed mlg
+BASE_KD = 1.8e3  # [derived] turntable damping (Nm s/rad): the old 2.0e3 N s/m x STATION_STANDOFF_M^2 #changed mlg
 ARM_CARRY_Q = (0.0, 0.4, 0.0, -1.6, 0.0, 1.2, 0.0)  # [measured] the psets' home pose; used while rolling
 
 # ------------------------------------------------------------------ physics

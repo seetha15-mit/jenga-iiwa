@@ -219,17 +219,17 @@ class OpeningToFingers(LeafSystem):
 
 
 class BaseCommand(LeafSystem):
-    """Holds the rolling base's commanded pose (x, y, yaw) and outputs it as a desired state [x, y, yaw, 0, 0, 0].
+    """Holds the rolling base's commanded pose (x, y, yaw) and outputs [yaw, 0].
     Set with .set(x, y, yaw) between AdvanceTo calls."""
 
-    def __init__(self, initial_xy_yaw):
+    def __init__(self, initial_yaw):
         super().__init__()
-        self._v = np.zeros(6)
-        self.set(*initial_xy_yaw)
-        self.DeclareVectorOutputPort("desired_state", 6, self._calc)
+        self._v = np.zeros(2)
+        self.set(initial_yaw)
+        self.DeclareVectorOutputPort("desired_state", 2, self._calc)
 
-    def set(self, x, y, yaw):
-        self._v[:3] = [x, y, yaw]
+    def set(self, yaw):
+        self._v[0] = yaw
 
     def _calc(self, context, output):
         output.SetFromVector(self._v)
