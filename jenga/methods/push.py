@@ -113,7 +113,7 @@ def plan_ped_place(X_RB, cfg):
     R_BG = RotationMatrix.MakeXRotation(np.radians(-180))@RotationMatrix.MakeZRotation(np.radians(-90))
     X_BG = RigidTransform(R_BG,[-L/2-cfg.FINGERTIP_REACH_M+L/5,0,0.5*H])
     setpoint = X_RBped @ X_BG
-    above = RigidTransform([0, 0, -0.05])
+    above = RigidTransform([0, 0, -0.1])
     setpounce = setpoint@above
     grip = W-1.75*cfg.FINGER_SQUEEZE_M
     touch = W - 0.005                                # pad gap = opening + 5 mm, so this is pads just touching
@@ -125,13 +125,15 @@ def plan_ped_place(X_RB, cfg):
     wayplist.append(Waypoint(setpoint,  touch + 0.010, 0.75))                # still: squeeze released, block on post
     wayplist.append(Waypoint(setpoint,  cfg.FINGER_OPEN_COMMAND_M, 0.5))     # still: small opening
     wayplist.append(Waypoint(setpoint,  cfg.FINGER_OPEN_COMMAND_M, 0.5))     # still: full open
-    wayplist.append(Waypoint(setpounce, cfg.FINGER_OPEN_COMMAND_M))          # only now lift
+    wayplist.append(Waypoint(setpounce, cfg.FINGER_OPEN_COMMAND_M))
+    wayplist.append(Waypoint(setpounce, cfg.FINGER_OPEN_COMMAND_M, 1))          # only now lift
+   # wayplist.append(Waypoint(end_pinch.plan_pull(X_RBped, cfg)[0].X_RG @ above, cfg.FINGER_OPEN_COMMAND_M))
     return wayplist
 
 
 def plan_regrab(X_RB, cfg):
     """Pick the block up off the pedestal by its ends (D-22): the same grasp end-pinch uses in the tower."""
-    
+
     return end_pinch.plan_pull(X_RB, cfg)
 
 
