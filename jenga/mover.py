@@ -48,6 +48,8 @@ class RealMover:
 
         ex = executor_api.get()
         method = methods.get_method(cfg.EXTRACTION_METHOD)
+        if hasattr(method, "method_for"):  # mixed: this block's own method runs the whole turn (D-07)
+            method = method.method_for(tower, block_id)
         layer, slot = target
 
         def in_R(X_WB):  # a world pose in the robot frame, where the base stands NOW

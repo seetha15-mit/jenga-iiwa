@@ -15,14 +15,14 @@ Frames: W = world (tower centre at the origin, table top at z = 0).
 """
 
 # ------------------------------------------------------------------ what to run
-N_LAYERS_START = 3  # [course] start with 3 layers; the TA said make 3 work before 12
+N_LAYERS_START = 6  # [user] 3 works with both methods, so 6 now; the TA said make 3 work before 12 (R-04)
 N_TRIALS = 10  # [course] at least 10 trials per approach
 BASE_SEED = 1000  # [estimate] trial i uses seed BASE_SEED + i (first block + hidden friction)
 MAX_TURNS = 10  # [estimate] a trial ends after this many turns even without a collapse
 MAX_CONSECUTIVE_FAILURES = 2  # [estimate] a trial ends after this many failed turns in a row
 START_SETTLE_S = 1.0  # [estimate] the tower stands this long before the first turn, so a replay opens on the intact tower
 MOVER = "fake"  # [user] "fake" = teleport placeholder (results INVALID), "real" = the team's steps
-EXTRACTION_METHOD = "end_pinch"  # [user] "end_pinch" (default) or "push" (push, pull, pedestal regrab, place; D-21)
+EXTRACTION_METHOD = "end_pinch"  # [user] "end_pinch" (default), "push" (push, pull, pedestal regrab, place; D-21) or "mixed" (push middles, end-pinch edges; D-07)
 STRATEGY = "random"  # [course] "random", "rule_based", "perception", "force_guided"
 COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 
@@ -94,6 +94,20 @@ JOINT_LIMIT_WARN_RAD = 0.05  # [estimate] warn if an arm joint ends this close t
 COLLAPSE_DISPLACEMENT_M = 0.02  # [estimate] any other block moving more than this ends the trial
 PLACE_TOLERANCE_M = 0.02  # [estimate] a block this close to its target slot counts as replaced
 PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pulled out
+
+# ------------------------------------------------------------------ rule-based strategy (jenga/strategies/rule_based.py)
+# Each factor is scored about 0 to 1; a weight says how much it counts.  0 turns a factor off.
+RB_W_HEIGHT = 1.0  # [estimate] layer: prefer higher layers (less weight on top of them)
+RB_W_FULL_LAYERS_NEAR = 1.0  # [estimate] layer: prefer layers whose neighbours above and below are still full
+RB_W_SELFSTILL = 1.0  # [estimate] layer: prefer layers whose blocks have not moved from their slots
+RB_W_OTHERNEARSTILL = 1.0  # [estimate] layer: prefer layers whose neighbour layers have not moved
+RB_LAYER_TIE = 0.1  # [estimate] layers scoring within this of the best are tied; one is chosen at random
+RB_W_EDGE = 1.0  # [estimate] block: prefer edge blocks (only matters for push; end-pinch takes edges only)
+RB_W_BALANCED = 1.0  # [estimate] block: prefer pulls that keep the support below the layer balanced
+RB_W_SELFSTILL_BLOCK = 1.0  # [estimate] block: prefer blocks that have not moved from their slot
+RB_W_BLOCKS_BELOW = 1.0  # [estimate] block: prefer blocks with their column below still filled
+RB_DISTURB_M = 0.002  # [estimate] a block moved this far counts as 1 unit of disturbance (same as STATIC_MAX_MOVE_M)
+RB_DISTURB_DEG = 2.0  # [estimate] a block turned this much counts as 1 unit of disturbance
 
 # ------------------------------------------------------------------ replay and logs
 RECORD_REPLAY = True  # [user] record each trial for a normal-speed replay afterwards

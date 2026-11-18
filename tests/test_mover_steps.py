@@ -77,6 +77,14 @@ class TestRealMoverSteps(unittest.TestCase):
         self.assertEqual(log, [("base", 0), ("pull", 0), ("base, no tuck", 1), ("place", 1)])
         self.assertEqual((info.station_pull, info.station_place), (0, 1))
 
+    def test_mixed_pushes_a_middle_block_and_end_pinches_an_edge_block(self):
+        cfg = make_cfg(EXTRACTION_METHOD="mixed")
+        log, _ = self.run_turn(cfg, push, 1, place_station=1)  # block 1: middle of layer 0
+        self.assertEqual([step for step, _ in log if not step.startswith("base")],
+                         ["push", "pull", "pedestal", "regrab", "place"])
+        log, _ = self.run_turn(cfg, end_pinch, 0, place_station=1)  # block 0: edge of layer 0
+        self.assertEqual([step for step, _ in log if not step.startswith("base")], ["pull", "place"])
+
 
 class BaseOnlyWorld:
     """Just enough of a Sim for executor.move_base_to_station: the base jumps to each target."""

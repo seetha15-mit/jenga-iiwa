@@ -60,7 +60,7 @@ def parse_sdf(path):
 
 class TestSceneFiles(unittest.TestCase):
     def build(self, **over):
-        cfg = make_cfg(**over)
+        cfg = make_cfg(**{"N_LAYERS_START": 3, **over})  # 9 blocks, as the tests below expect
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         patcher = mock.patch.dict(sys.modules, _fake_modules())

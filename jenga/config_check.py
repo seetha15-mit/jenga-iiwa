@@ -27,7 +27,7 @@ def check_tags(path) -> list:
 def check_values(cfg) -> list:
     w = []
     choices = {
-        "MOVER": ("fake", "real"), "EXTRACTION_METHOD": ("end_pinch", "push"),
+        "MOVER": ("fake", "real"), "EXTRACTION_METHOD": ("end_pinch", "push", "mixed"),
         "STRATEGY": ("random", "rule_based", "perception", "force_guided"),
         "COLLAPSE_DETECTOR": ("basic", "advanced"), "BASE_MODE": ("mobile", "fixed"),
         "CONTACT_MODEL": ("hydroelastic", "point"), "FRICTION_MODE": ("global", "random"),

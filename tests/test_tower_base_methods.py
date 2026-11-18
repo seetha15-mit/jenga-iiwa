@@ -10,7 +10,7 @@ from tests.helpers import make_cfg
 
 class TestTower(unittest.TestCase):
     def setUp(self):
-        self.cfg = make_cfg()
+        self.cfg = make_cfg(N_LAYERS_START=3)  # the expected block ids below are for a 3-layer tower
         self.t = TowerState(self.cfg)
 
     def test_initial_state(self):
@@ -61,7 +61,7 @@ class TestTower(unittest.TestCase):
 
 class TestBase(unittest.TestCase):
     def setUp(self):
-        self.cfg = make_cfg()
+        self.cfg = make_cfg(N_LAYERS_START=3)  # the expected block ids below are for a 3-layer tower
         self.t = TowerState(self.cfg)
 
     def test_every_station_sees_the_tower_straight_ahead_at_the_standoff(self):
@@ -122,7 +122,7 @@ class TestBase(unittest.TestCase):
 
 class TestEndPinchRules(unittest.TestCase):
     def setUp(self):
-        self.cfg = make_cfg()
+        self.cfg = make_cfg(N_LAYERS_START=3)  # the expected block ids below are for a 3-layer tower
         self.t = TowerState(self.cfg)
 
     def test_only_edge_blocks_can_be_pulled(self):
@@ -142,6 +142,15 @@ class TestEndPinchRules(unittest.TestCase):
     def test_choose_station_for_a_pull(self):
         self.assertEqual(end_pinch.choose_station(self.t, 0, self.cfg, current_station=2), 0)
 
+    def test_mixed_takes_every_block_with_the_right_method(self):
+        mixed = get_method("mixed")
+        for b, rec in self.t.blocks.items():
+            self.assertIs(mixed.method_for(self.t, b), push if rec.slot == 1 else end_pinch, f"block {b}")
+            self.assertTrue(mixed.can_pull(self.t, b, self.cfg), f"block {b}")  # middles too, unlike end-pinch
+        for layer, slot in self.t.placement_slots():
+            self.assertEqual(mixed.choose_place_station(self.t, layer, slot, self.cfg, 0),
+                             end_pinch.choose_place_station(self.t, layer, slot, self.cfg, 0))
+
     def test_method_registry(self):
         self.assertIs(get_method("end_pinch"), end_pinch)
         with self.assertRaises(ValueError):
@@ -150,7 +159,7 @@ class TestEndPinchRules(unittest.TestCase):
 
 class TestPushRules(unittest.TestCase):
     def setUp(self):
-        self.cfg = make_cfg()
+        self.cfg = make_cfg(N_LAYERS_START=3)  # the expected block ids below are for a 3-layer tower
         self.t = TowerState(self.cfg)
 
     def angles(self, block_id):
