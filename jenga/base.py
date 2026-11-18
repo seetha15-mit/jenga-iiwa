@@ -113,7 +113,8 @@ def base_path(cfg, start_xy_yaw, k_target: int):
     """Waypoints (x, y, yaw) for the base from where it is now to station k_target.
 
     Roll straight out to BASE_TRAVEL_RADIUS_M, around the tower along a circle (the robot keeps facing
-    the tower), then straight in.  The arm is tucked meanwhile (config.ARM_CARRY_Q).  Yaw is unwrapped
+    the tower), then straight in.  The arm is tucked meanwhile (config.ARM_CARRY_Q), except on the way
+    to a place, where it stays as the last plan left it (executor.move_base_to_station, DECISIONS D-02).  Yaw is unwrapped
     (continuous), because the base's yaw joint has no limit.
 
     Only 'face the tower' poses are supported here.  A free-moving base (option C in DECISIONS.md)

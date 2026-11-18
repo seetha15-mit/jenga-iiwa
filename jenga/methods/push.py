@@ -10,7 +10,7 @@ A turn has five steps, in this order (jenga/mover.py RealMover runs them, each s
     plan_ped_place  at the same station: set it on the pedestal on the robot's left (D-22)
     plan_regrab     at the same station: pick it up level by its ends (end_pinch.plan_pull)
     plan_place      at the place station (choose_place_station): carry, lower, release (end_pinch.plan_place)
-The base rolls between the stations with the arm in its carry pose.
+The base rolls between the stations with the arm in its carry pose, except on the way to the place (D-02).
 
 Rules (which blocks, which stations) were written with Claude; the plans are Katie's.  Measured status and
 limits (tuned on block 1; needs two or more layers above the pulled block) are in DECISIONS.md O-5.
@@ -133,14 +133,14 @@ def plan_ped_place(X_RB, cfg):
 
 def plan_regrab(X_RB, cfg):
     """Pick the block up off the pedestal by its ends (D-22): the same grasp end-pinch uses in the tower,
-    with one extra first waypoint 30 mm above end-pinch's start.  That first waypoint is reached by a joint
-    move whose arc passes the block on the post: 30 mm up leaves 47 mm of gripper clearance (21.5 mm without
-    it) while IK keeps nearly the same arm shape (7 deg), so the tuck into the carry pose stays as gentle as
-    the original's.  50 mm or more changed the arm shape and the block slipped in the tuck.  (Kinematic check,
-    scratch/check_regrab_starts.py; not yet confirmed in simulation.)"""
+    with one extra first waypoint 50 mm above end-pinch's start.  That first waypoint is reached by a joint
+    move whose arc passes the block on the post: 50 mm up leaves 66 mm of gripper clearance, 21.5 mm without
+    it, where the arc knocked the block off (kinematic check, scratch/check_regrab_starts.py).  The higher
+    start changes the arm shape, which made the block slip in the old tuck into the carry pose; the base now
+    rolls to the place without that tuck (mover.RealMover, O-5)."""
     from pydrake.all import RigidTransform
     wps = end_pinch.plan_pull(X_RB, cfg)  # wps[0] is end-pinch's start (pounce) pose
-    high = wps[0].X_RG @ RigidTransform([0, 0, -0.02])  # 20 mm up (end-pinch's G z points down)
+    high = wps[0].X_RG @ RigidTransform([0, 0, -0.05])  # 50 mm up (end-pinch's G z points down)
     return [Waypoint(high, cfg.FINGER_OPEN_COMMAND_M)] + wps
 
 

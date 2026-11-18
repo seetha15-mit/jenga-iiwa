@@ -36,9 +36,11 @@ class TestPedPlace(unittest.TestCase):
         self.assertLess(self.wps[2].opening, self.cfg.FINGER_OPEN_COMMAND_M)
 
     def test_lift_comes_last_and_hand_is_open(self):
-        last, before = self.wps[-1], self.wps[-2]
-        self.assertGreater(last.X_RG.translation()[2], before.X_RG.translation()[2])
-        self.assertEqual(before.opening, self.cfg.FINGER_OPEN_COMMAND_M)
+        # the plan may end with a still hold at the top, so find the last leg that rises
+        zs = [w.X_RG.translation()[2] for w in self.wps]
+        lift = max(i for i in range(1, len(zs)) if zs[i] > zs[i - 1] + 1e-9)
+        self.assertEqual(zs[-1], max(zs))
+        self.assertEqual(self.wps[lift - 1].opening, self.cfg.FINGER_OPEN_COMMAND_M)
 
     def test_release_is_below_the_post_top(self):
         # the block bottom at the set point sits 2 mm under PEDESTAL_HEIGHT_M (see plan_ped_place)

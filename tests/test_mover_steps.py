@@ -74,7 +74,7 @@ class TestRealMoverSteps(unittest.TestCase):
 
     def test_end_pinch_still_runs_pull_then_place(self):
         log, info = self.run_turn(make_cfg(EXTRACTION_METHOD="end_pinch"), end_pinch, 0, place_station=1)
-        self.assertEqual(log, [("base", 0), ("pull", 0), ("base", 1), ("place", 1)])
+        self.assertEqual(log, [("base", 0), ("pull", 0), ("base, no tuck", 1), ("place", 1)])
         self.assertEqual((info.station_pull, info.station_place), (0, 1))
 
 
