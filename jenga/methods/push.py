@@ -125,8 +125,7 @@ def plan_ped_place(X_RB, cfg):
     wayplist.append(Waypoint(setpoint,  touch + 0.010, 0.75))                # still: squeeze released, block on post
     wayplist.append(Waypoint(setpoint,  cfg.FINGER_OPEN_COMMAND_M, 0.5))     # still: small opening
     wayplist.append(Waypoint(setpoint,  cfg.FINGER_OPEN_COMMAND_M, 0.5))     # still: full open
-    wayplist.append(Waypoint(setpounce, cfg.FINGER_OPEN_COMMAND_M))
-    wayplist.append(Waypoint(setpounce, cfg.FINGER_OPEN_COMMAND_M, 1))          # only now lift
+    wayplist.append(Waypoint(setpounce, cfg.FINGER_OPEN_COMMAND_M))        # only now lift
    # wayplist.append(Waypoint(end_pinch.plan_pull(X_RBped, cfg)[0].X_RG @ above, cfg.FINGER_OPEN_COMMAND_M))
     return wayplist
 
