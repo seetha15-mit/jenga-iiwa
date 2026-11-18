@@ -78,7 +78,7 @@ class RealMover:
 
         # ---- place (the block stays in the hand while the base rolls)
         k_place = method.choose_place_station(tower, layer, slot, cfg, world.station)
-        ex.move_base_to_station(world, k_place)
+        ex.move_base_to_station(world, k_place, tuck=not hasattr(method, "plan_push"))  # push: no tuck after the regrab (O-5)
         ex.run_plan(world, method.plan_place(in_R(tower.target_pose(layer, slot)), cfg), cfg.WAYPOINT_SPEED_MS,
                     label="place")
         return TurnInfo(k_pull, k_place)

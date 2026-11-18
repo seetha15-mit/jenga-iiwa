@@ -24,9 +24,9 @@ class FakeExecutor:
     def __init__(self):
         self.log = []
 
-    def move_base_to_station(self, world, k):
+    def move_base_to_station(self, world, k, tuck=True):
         world.station = k
-        self.log.append(("base", k))
+        self.log.append(("base", k) if tuck else ("base, no tuck", k))
 
     def run_plan(self, world, waypoints, speed, label=""):
         self.log.append((label, world.station))
@@ -65,16 +65,54 @@ class TestRealMoverSteps(unittest.TestCase):
 
     def test_push_runs_push_pull_pedestal_regrab_place_at_their_stations(self):
         # block 1 (layer 0, middle) from station 0: push from 1 (nearest of 1 and 3), pull from 3, set it on the
-        # pedestal and regrab it there (two plans, so each starts with a joint move), place from 1
+        # pedestal and regrab it there (two plans, so each starts with a joint move), place from 1; no tuck after
+        # the regrab, so the end-pinched block is not swung through the ~150 deg wrist turn (O-5)
         log, info = self.run_turn(make_cfg(EXTRACTION_METHOD="push"), push, 1, place_station=1)
         self.assertEqual(log, [("base", 1), ("push", 1), ("base", 3), ("pull", 3), ("pedestal", 3), ("regrab", 3),
-                               ("base", 1), ("place", 1)])
+                               ("base, no tuck", 1), ("place", 1)])
         self.assertEqual((info.station_pull, info.station_place), (3, 1))
 
     def test_end_pinch_still_runs_pull_then_place(self):
         log, info = self.run_turn(make_cfg(EXTRACTION_METHOD="end_pinch"), end_pinch, 0, place_station=1)
         self.assertEqual(log, [("base", 0), ("pull", 0), ("base", 1), ("place", 1)])
         self.assertEqual((info.station_pull, info.station_place), (0, 1))
+
+
+class BaseOnlyWorld:
+    """Just enough of a Sim for executor.move_base_to_station: the base jumps to each target."""
+
+    def __init__(self, cfg):
+        self.cfg, self.station, self.mobile = cfg, 0, True
+        self.q = base.base_xy_yaw(cfg, 0)
+
+    def base_q(self):
+        return self.q
+
+    def set_base_target(self, x, y, yaw):
+        self.q = (x, y, yaw)
+
+    def advance(self, dt):
+        pass
+
+    def hold(self, seconds):
+        pass
+
+
+@unittest.skipUnless(HAVE_DRAKE, "needs pydrake")
+class TestBaseMoveTuck(unittest.TestCase):
+    def move(self, **kw):
+        from jenga import executor
+        world = BaseOnlyWorld(make_cfg())
+        with mock.patch.object(executor, "move_arm_to_q") as arm:
+            executor.move_base_to_station(world, 1, **kw)
+        self.assertEqual(world.station, 1)
+        return arm.call_count
+
+    def test_tucks_by_default(self):
+        self.assertEqual(self.move(), 1)
+
+    def test_tuck_false_leaves_the_arm_alone(self):
+        self.assertEqual(self.move(tuck=False), 0)
 
 
 if __name__ == "__main__":

@@ -116,15 +116,18 @@ def hold(world, seconds: float) -> None:
     world.hold(seconds)
 
 
-def move_base_to_station(world, k: int) -> None:
+def move_base_to_station(world, k: int, tuck: bool = True) -> None:
     """Roll the base to station k (arm tucked in its carry pose, fingers keep their last command).
+    tuck=False leaves the arm as it is: the push method's carry after the regrab, where the tuck from the
+    regrab pose swings the wrist ~150 deg and the end-pinched block slips (O-5).
     Does nothing if the base is already there.  With BASE_MODE = "fixed" only station 0 exists."""
     cfg = world.cfg
     if k == world.station:
         return
     if not world.mobile:
         raise MotionFailed(f"BASE_MODE is 'fixed': cannot move from station {world.station} to {k}")
-    move_arm_to_q(world, cfg.ARM_CARRY_Q, label="carry pose")
+    if tuck:
+        move_arm_to_q(world, cfg.ARM_CARRY_Q, label="carry pose")
     path = base_mod.base_path(cfg, world.base_q(), k)
     dt = 0.05
     for target in base_mod.sample_path(path, cfg.BASE_SPEED_MS, dt):
