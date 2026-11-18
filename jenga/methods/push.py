@@ -140,7 +140,7 @@ def plan_regrab(X_RB, cfg):
     scratch/check_regrab_starts.py; not yet confirmed in simulation.)"""
     from pydrake.all import RigidTransform
     wps = end_pinch.plan_pull(X_RB, cfg)  # wps[0] is end-pinch's start (pounce) pose
-    high = wps[0].X_RG @ RigidTransform([0, 0, -0.03])  # 30 mm up (end-pinch's G z points down)
+    high = wps[0].X_RG @ RigidTransform([0, 0, -0.02])  # 20 mm up (end-pinch's G z points down)
     return [Waypoint(high, cfg.FINGER_OPEN_COMMAND_M)] + wps
 
 
