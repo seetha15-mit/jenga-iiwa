@@ -133,14 +133,15 @@ def plan_ped_place(X_RB, cfg):
 
 def plan_regrab(X_RB, cfg):
     """Pick the block up off the pedestal by its ends (D-22): the same grasp end-pinch uses in the tower,
-    with one extra first waypoint 50 mm above end-pinch's start.  That first waypoint is reached by a joint
-    move whose arc passes the block on the post: 50 mm up leaves 66 mm of gripper clearance, 21.5 mm without
-    it, where the arc knocked the block off (kinematic check, scratch/check_regrab_starts.py).  The higher
-    start changes the arm shape, which made the block slip in the old tuck into the carry pose; the base now
-    rolls to the place without that tuck (mover.RealMover, O-5)."""
+    with one extra first waypoint 20 mm above end-pinch's start.  That first waypoint is reached by a joint
+    move whose arc passes the block on the post: 20 mm up leaves 32 mm of gripper clearance, 21.5 mm without
+    it, where the arc knocked the block off (kinematic check, scratch/check_regrab_starts.py).  50 mm (66 mm)
+    placed on the Mac, but on the cluster the hand stopped above the place point and let go in the air; its
+    larger change of arm shape is the likely cause (not confirmed).  The base rolls to the place without the
+    tuck into the carry pose (mover.RealMover, O-5)."""
     from pydrake.all import RigidTransform
     wps = end_pinch.plan_pull(X_RB, cfg)  # wps[0] is end-pinch's start (pounce) pose
-    high = wps[0].X_RG @ RigidTransform([0, 0, -0.05])  # 50 mm up (end-pinch's G z points down)
+    high = wps[0].X_RG @ RigidTransform([0, 0, -0.02])  # 20 mm up (end-pinch's G z points down)
     return [Waypoint(high, cfg.FINGER_OPEN_COMMAND_M)] + wps
 
 
