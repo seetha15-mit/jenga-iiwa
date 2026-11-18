@@ -133,8 +133,11 @@ def plan_ped_place(X_RB, cfg):
 
 def plan_regrab(X_RB, cfg):
     """Pick the block up off the pedestal by its ends (D-22): the same grasp end-pinch uses in the tower."""
-
-    return end_pinch.plan_pull(X_RB, cfg)
+    from pydrake.all import RigidTransform, RotationMatrix
+    wps = end_pinch.plan_pull(X_RB, cfg)
+    back = wps[0].X_RG @ RigidTransform([0, -0.1, 0])     # 100 mm further back along the reach axis, same height and turn
+    return [Waypoint(back, cfg.FINGER_OPEN_COMMAND_M)] + wps
+    #return end_pinch.plan_pull(X_RB, cfg)
 
 
 def plan_place(X_RT, cfg):
