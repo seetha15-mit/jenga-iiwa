@@ -97,7 +97,7 @@ PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pull
 
 # ------------------------------------------------------------------ rule-based strategy (jenga/strategies/rule_based.py)
 # Each factor is scored about 0 to 1; a weight says how much it counts.  0 turns a factor off.
-RB_W_HEIGHT = 1.0  # [estimate] layer: prefer higher layers (less weight on top of them)
+RB_W_HEIGHT = 1.0  # [estimate] layer: prefer LOWER layers (end-pinch on a fresh 6-layer tower moved it < 1 mm from layers 0-2, ~2.7 mm from 3, collapsed it from 4; measured, Mac, 7 blocks)
 RB_W_FULL_LAYERS_NEAR = 1.0  # [estimate] layer: prefer layers whose neighbours above and below are still full
 RB_W_SELFSTILL = 1.0  # [estimate] layer: prefer layers whose blocks have not moved from their slots
 RB_W_OTHERNEARSTILL = 1.0  # [estimate] layer: prefer layers whose neighbour layers have not moved

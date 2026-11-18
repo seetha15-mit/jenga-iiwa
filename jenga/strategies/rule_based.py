@@ -80,7 +80,7 @@ def layerscore(tower, layers,cfg):
         layer_below = max((l for l in range(toplayer+1) if l < candidatelayer), default=None)
         scores[candidatelayer] = 0
         # each score scaled from 0 to 1, using sigmoid for distances
-        height = candidatelayer/toplayer #it gets more points for being higher
+        height = 1-candidatelayer/toplayer #it gets more points for being lower (more weight on top: end-pinch moved the tower less)
         fulllayersnear = 0.5*(threeblocksleft(tower,layer_above)+threeblocksleft(tower,layer_below))
         selfstill = 1/(1+layerdisturbance(tower,candidatelayer,cfg))
         othernearstill = 1/(1+layerdisturbance(tower,layer_above,cfg)+layerdisturbance(tower,layer_below,cfg))
