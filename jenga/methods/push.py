@@ -132,12 +132,16 @@ def plan_ped_place(X_RB, cfg):
 
 
 def plan_regrab(X_RB, cfg):
-    """Pick the block up off the pedestal by its ends (D-22): the same grasp end-pinch uses in the tower."""
-    from pydrake.all import RigidTransform, RotationMatrix
-    wps = end_pinch.plan_pull(X_RB, cfg)
-    back = wps[0].X_RG @ RigidTransform([0, -0.1, 0])     # 100 mm further back along the reach axis, same height and turn
-    return [Waypoint(back, cfg.FINGER_OPEN_COMMAND_M)] + wps
-    #return end_pinch.plan_pull(X_RB, cfg)
+    """Pick the block up off the pedestal by its ends (D-22): the same grasp end-pinch uses in the tower,
+    with one extra first waypoint 30 mm above end-pinch's start.  That first waypoint is reached by a joint
+    move whose arc passes the block on the post: 30 mm up leaves 47 mm of gripper clearance (21.5 mm without
+    it) while IK keeps nearly the same arm shape (7 deg), so the tuck into the carry pose stays as gentle as
+    the original's.  50 mm or more changed the arm shape and the block slipped in the tuck.  (Kinematic check,
+    scratch/check_regrab_starts.py; not yet confirmed in simulation.)"""
+    from pydrake.all import RigidTransform
+    wps = end_pinch.plan_pull(X_RB, cfg)  # wps[0] is end-pinch's start (pounce) pose
+    high = wps[0].X_RG @ RigidTransform([0, 0, -0.03])  # 30 mm up (end-pinch's G z points down)
+    return [Waypoint(high, cfg.FINGER_OPEN_COMMAND_M)] + wps
 
 
 def plan_place(X_RT, cfg):
