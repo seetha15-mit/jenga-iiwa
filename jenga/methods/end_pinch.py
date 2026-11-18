@@ -110,13 +110,13 @@ def plan_pull(X_RB, cfg):
     pickpoint = X_RB@X_BG
     pickpounce = pickpoint@offset
     wayplist = []
-    wayplist.append(Waypoint(pickpounce@RigidTransform([0,0,-0.1]),cfg.FINGER_OPEN_COMMAND_M))
+    wayplist.append(Waypoint(pickpounce@RigidTransform([0,0,-0.05]),cfg.FINGER_OPEN_COMMAND_M))
     wayplist.append(Waypoint(pickpounce, cfg.FINGER_OPEN_COMMAND_M))     # 1. get near, open
     wayplist.append(Waypoint(pickpoint,  cfg.FINGER_OPEN_COMMAND_M))
     wayplist.append(Waypoint(pickpoint,  L-cfg.FINGER_SQUEEZE_M))     # 2. move onto the block
     wayplist.append(Waypoint(pickpoint,  L-2*cfg.FINGER_SQUEEZE_M,1.0))# 3. SAME pose, close = grasp
-    wayplist.append(Waypoint(pickpounce, L-3*cfg.FINGER_SQUEEZE_M))   # 4. retreat holding it
-    wayplist.append(Waypoint(pickpounce@upoffset,L-3*cfg.FINGER_SQUEEZE_M))
+    wayplist.append(Waypoint(pickpounce, L-2*cfg.FINGER_SQUEEZE_M))   # 4. retreat holding it
+    wayplist.append(Waypoint(pickpounce@upoffset,L-2*cfg.FINGER_SQUEEZE_M))
     return wayplist
     
     # ---- END CODE TO BE WRITTEN ----
