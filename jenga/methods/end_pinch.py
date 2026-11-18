@@ -155,8 +155,8 @@ def plan_place(X_RT, cfg):
     placepoint = X_RT@X_TG
     placepounce = placepoint@offset
     wayplist = []
-    wayplist.append(Waypoint(placepounce, L-cfg.FINGER_SQUEEZE_M))   
-    wayplist.append(Waypoint(placepoint,  L-cfg.FINGER_SQUEEZE_M))    
+    wayplist.append(Waypoint(placepounce, L-2*cfg.FINGER_SQUEEZE_M))   
+    wayplist.append(Waypoint(placepoint,  L-2*cfg.FINGER_SQUEEZE_M))    
     wayplist.append(Waypoint(placepoint,  cfg.FINGER_OPEN_COMMAND_M))
     wayplist.append(Waypoint(placepoint,  cfg.FINGER_OPEN_COMMAND_M, 1.0))   
     wayplist.append(Waypoint(placepounce, cfg.FINGER_OPEN_COMMAND_M))   
