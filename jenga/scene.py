@@ -193,7 +193,7 @@ class Sim:
         arm_q = builder.AddSystem(FirstEntries(14, 7))
         joint_velocity = builder.AddSystem(JointVelocity(self.kin.plant))
         selector = builder.AddSystem(VelocitySelector(self.player))
-        self.integrator = builder.AddSystem(DiscreteIntegrator(7, cfg.PLANT_TIME_STEP))  # D-24
+        self.integrator = builder.AddSystem(DiscreteIntegrator(7, cfg.PLANT_TIME_STEP / cfg.CMD_SUBSTEPS))  # D-24
         self.integrator.set_name("JointIntegrator")
         arm_desired = builder.AddSystem(PositionToState(7))
         builder.Connect(self.plant.get_state_output_port(self.iiwa), arm_q.get_input_port())

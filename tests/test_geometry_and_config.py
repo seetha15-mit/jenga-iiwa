@@ -61,6 +61,11 @@ class TestOverrides(unittest.TestCase):
             with self.assertRaises((ValueError, SyntaxError)):
                 config_check.apply_overrides(make_cfg(), [bad])
 
+    def test_cmd_substeps_must_be_a_whole_number(self):
+        self.assertFalse(any("CMD_SUBSTEPS" in w for w in config_check.check_values(make_cfg())))
+        for bad in (0, 2.5):
+            self.assertTrue(any("CMD_SUBSTEPS" in w for w in config_check.check_values(make_cfg(CMD_SUBSTEPS=bad))))
+
     def test_nothing_to_override(self):
         self.assertEqual(config_check.apply_overrides(make_cfg(), []), [])
 

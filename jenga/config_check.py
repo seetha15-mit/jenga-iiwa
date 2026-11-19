@@ -60,6 +60,8 @@ def check_values(cfg) -> list:
         w.append("ARM_KP/ARM_KD need 7 entries and BASE_KP/BASE_KD need 3.")
     if cfg.PLANT_TIME_STEP is None or cfg.PLANT_TIME_STEP <= 0:
         w.append("PLANT_TIME_STEP must be a positive number (the plant is built by hand and needs one).")
+    if not isinstance(cfg.CMD_SUBSTEPS, int) or cfg.CMD_SUBSTEPS < 1:
+        w.append("CMD_SUBSTEPS must be a whole number >= 1 (arm-command updates per physics step, D-24).")
     if cfg.N_LAYERS_START < 2:
         w.append("N_LAYERS_START must be at least 2: there is nothing legal to pull from one layer.")
     if cfg.MAX_TURNS < 1 or cfg.N_TRIALS < 1:

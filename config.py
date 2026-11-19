@@ -77,6 +77,7 @@ ARM_CARRY_Q = (0.0, 0.4, 0.0, -1.6, 0.0, 1.2, 0.0)  # [measured] the psets' home
 CONTACT_MODEL = "hydroelastic"  # [estimate] "hydroelastic" or "point"; TODO compare (DECISIONS.md)
 CONTACT_APPROXIMATION = "lagged"  # [measured] "sap", "lagged", "similar" or "default" (Drake's own); with "sap" a pull dragged the layer above out with the block (Drake documents SAP 'gliding' in sliding contact), with "lagged" it came out cleanly (DECISIONS.md D-10)
 PLANT_TIME_STEP = 0.005  # [estimate] seconds per physics step; try 0.002 etc. when testing speed
+CMD_SUBSTEPS = 5  # [user] the arm command is integrated this many times per physics step (1 ms; the old continuous integrator took ~1 RK3 step, 3 samples, per physics step; measured; D-24)
 ARM_KP = (1.0e4, 1.0e4, 1.0e4, 1.0e4, 5.0e3, 3.0e3, 2.0e3)  # [estimate] arm joint stiffness (Nm/rad); the arm is gravity-compensated (see DECISIONS.md)
 ARM_KD = (500.0, 500.0, 300.0, 300.0, 100.0, 60.0, 40.0)  # [estimate] arm joint damping (Nm s/rad)
 FINGER_KP = 2000.0  # [estimate] finger stiffness (N/m): grip force = this x how far past the block the fingers are commanded
