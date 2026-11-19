@@ -29,7 +29,7 @@ COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 # ------------------------------------------------------------------ blocks
 BLOCK_REAL_M = (0.075, 0.025, 0.015)  # [course] a real Jenga block: length, width, height
 BLOCK_SCALE = 1.45  # [user] ONE scale for all three dimensions (decided from the gripper numbers)
-BLOCK_GAP_M = 0.0005  # [estimate] gap between neighbouring blocks (prototype value, not verified)
+BLOCK_GAP_M = 0.0005  # [estimate] gap between neighbouring blocks in a layer (prototype value, not verified); layers stack with no gap (D-25)
 BLOCK_DENSITY = 700.0  # [estimate] kg/m^3; gives about 0.06 kg per block at this scale
 FRICTION_MODE = "global"  # [user] "global" (all equal) or "random" (varied, hidden from strategies)
 FRICTION_GLOBAL = 0.5  # [estimate] used when FRICTION_MODE = "global"
@@ -99,14 +99,14 @@ PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pull
 
 # ------------------------------------------------------------------ rule-based strategy (jenga/strategies/rule_based.py)
 # Each factor is scored about 0 to 1; a weight says how much it counts.  0 turns a factor off.
-RB_W_HEIGHT = 1.0  # [estimate] layer: prefer LOWER layers (cluster, 50 trials, 0.1 s pull: 3.42 blocks per trial preferring low, 3.22 high, 3.36 off, 3.08 random; differences not significant; D-23)
-RB_W_FULL_LAYERS_NEAR = 1.0  # [estimate] layer: prefer layers whose neighbours above and below are still full
+RB_W_HEIGHT = 0.0  # [user] layer: prefer LOWER layers; off in V2 (cluster, 100 paired trials: V2 4.23 blocks per trial vs 3.15 random, 3.39 with height 1.0 and the old full weights; D-23)
+RB_W_FULL_LAYERS_NEAR = 0.5  # [user] layer: prefer layers whose neighbours above and below are still full (halved in V2, D-23)
 RB_W_SELFSTILL = 1.0  # [estimate] layer: prefer layers whose blocks have not moved from their slots
 RB_W_OTHERNEARSTILL = 1.0  # [estimate] layer: prefer layers whose neighbour layers have not moved
-RB_W_SELF_FULL = 1.5  # [estimate] layer: prefer layers that still have all three blocks (was a hard filter: it forced layer-3 pulls)
+RB_W_SELF_FULL = 0.75  # [user] layer: prefer layers that still have all three blocks (halved in V2; full layer + full neighbours drew B into mid-tower pulls, D-23)
 RB_W_CLEAR_OF_TOP = 2.0  # [estimate] layer: avoid the layer right under the highest complete layer (pulling block 12 from layer 4 under full layer 5 dropped the top: Mac, 1 run; on a fresh tower it was fine)
-RB_CLEAR_OF_TOP_LAYERS = 1  # [estimate] how many layers under the highest complete layer count for RB_W_CLEAR_OF_TOP (B pulled layer 4 right after layer 6 filled and collapsed: 5 of 5 of random's best trials; cluster)
-RB_W_CLEAR_OF_BOTTOM = 0.0  # [estimate] layer: avoid layer 0 only (0 = off; B emptied layers 0-1 first in the same 5 trials, random's long games rarely touched layer 0)
+RB_CLEAR_OF_TOP_LAYERS = 1  # [user] how many layers under the highest complete layer count for RB_W_CLEAR_OF_TOP (2 cost 0.6 blocks per trial against V2: cluster, 100 trials, D-23)
+RB_W_CLEAR_OF_BOTTOM = 2.0  # [user] layer: avoid layer 0 only (V2; +0.46 blocks per trial over the same weights without it, cluster, 100 trials, D-23)
 RB_LAYER_TIE = 0.1  # [estimate] layers scoring within this of the best are tied; one is chosen at random
 RB_W_EDGE = 1.0  # [estimate] block: prefer edge blocks (only matters for push; end-pinch takes edges only)
 RB_W_BALANCED = 1.0  # [estimate] block: prefer pulls that keep the support below the layer balanced

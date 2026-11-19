@@ -72,14 +72,14 @@ class TestRuleBased(unittest.TestCase):
     def test_height_rule_prefers_lower_layers(self):
         from jenga.strategies import rule_based
         only_height = make_cfg(N_LAYERS_START=3, RB_W_HEIGHT=1.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
-                               RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=0.0)
+                               RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=0.0, RB_W_CLEAR_OF_BOTTOM=0.0)
         s = rule_based.layerscore(self.t, [0, 1], only_height)
         self.assertGreater(s[0], s[1])
 
     def test_the_layer_under_the_top_is_scored_down(self):
         from jenga.strategies import rule_based
         only_top = make_cfg(N_LAYERS_START=3, RB_W_HEIGHT=0.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
-                            RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=2.0)
+                            RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=2.0, RB_W_CLEAR_OF_BOTTOM=0.0)
         s = rule_based.layerscore(self.t, [0, 1], only_top)  # layer 2 is the highest complete: layer 1 is under it
         self.assertEqual((s[0], s[1]), (2.0, 0.0))
         for b, slot in ((0, 0), (2, 2), (1, 1)):  # complete layer 3 (from layer 0's blocks): layer 2 is now under the top
