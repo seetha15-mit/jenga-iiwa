@@ -45,6 +45,26 @@ class TestGeometry(unittest.TestCase):
         self.assertEqual(set(geo.assign_friction(make_cfg(), 0).values()), {0.5})
 
 
+class TestOverrides(unittest.TestCase):
+    """run_one_trial.py --set: per-job config values for the cluster weight variants."""
+
+    def test_sets_values_for_this_run_only(self):
+        import config
+        cfg = make_cfg()
+        applied = config_check.apply_overrides(cfg, ["RB_W_HEIGHT=-1.0", "RB_W_CLEAR_OF_TOP=0", "STRATEGY='random'"])
+        self.assertEqual(applied, [("RB_W_HEIGHT", -1.0), ("RB_W_CLEAR_OF_TOP", 0), ("STRATEGY", "random")])
+        self.assertEqual((cfg.RB_W_HEIGHT, cfg.RB_W_CLEAR_OF_TOP), (-1.0, 0))
+        self.assertNotEqual(config.RB_W_HEIGHT, -1.0)  # config.py itself is untouched
+
+    def test_a_typo_or_missing_value_stops_the_run(self):
+        for bad in ("RB_W_HIEGHT=1.0", "RB_W_HEIGHT", "RB_W_HEIGHT=abc"):
+            with self.assertRaises((ValueError, SyntaxError)):
+                config_check.apply_overrides(make_cfg(), [bad])
+
+    def test_nothing_to_override(self):
+        self.assertEqual(config_check.apply_overrides(make_cfg(), []), [])
+
+
 class TestConfig(unittest.TestCase):
     def test_repo_config_has_no_untagged_settings(self):
         self.assertEqual(config_check.check_tags(Path("config.py")), [])

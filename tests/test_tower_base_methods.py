@@ -35,14 +35,14 @@ class TestTower(unittest.TestCase):
     def test_legal_pulls_exclude_top_complete_layer(self):
         self.assertEqual(sorted(self.t.pull_candidates()), [0, 1, 2, 3, 4, 5])
 
-    def test_placement_goes_on_a_new_layer_edges_first(self):
-        self.assertEqual(self.t.placement_slots(), [(3, 0), (3, 2), (3, 1)])
+    def test_placement_goes_on_a_new_layer_edge_middle_edge(self):
+        self.assertEqual(self.t.placement_slots(), [(3, 0), (3, 1), (3, 2)])
 
     def test_after_replacing_one_block(self):
         self.t.place(0, 3, 0)
         self.assertEqual(self.t.top_layer(), 3)
         self.assertFalse(self.t.is_complete(3))
-        self.assertEqual(self.t.placement_slots(), [(3, 2), (3, 1)])
+        self.assertEqual(self.t.placement_slots(), [(3, 1), (3, 2)])
         # layer 3 (being built) and layer 2 (highest complete) are excluded; block 0 left layer 0
         self.assertEqual(sorted(self.t.pull_candidates()), [1, 2, 3, 4, 5])
 
@@ -135,6 +135,14 @@ class TestEndPinchRules(unittest.TestCase):
         self.assertEqual(end_pinch.place_stations(self.t, 3, 2, self.cfg), [3])
         self.assertEqual(end_pinch.place_stations(self.t, 3, 1, self.cfg), [1, 3])
         self.assertEqual(end_pinch.choose_place_station(self.t, 3, 1, self.cfg, current_station=3), 3)
+
+    def test_middle_is_placed_from_the_placed_edges_side(self):
+        for edge in (0, 2):
+            t = TowerState(self.cfg)
+            t.place(0, 3, edge)
+            [k_edge] = end_pinch.place_stations(t, 3, edge, self.cfg)
+            for current in range(4):
+                self.assertEqual(end_pinch.choose_place_station(t, 3, 1, self.cfg, current), k_edge)
 
     def test_every_empty_slot_can_be_placed_by_end_pinch(self):
         self.assertTrue(all(end_pinch.can_place(self.t, l, s, self.cfg) for l, s in self.t.placement_slots()))

@@ -3,8 +3,10 @@
 check_tags(path)   every setting must end with a source tag: [user] [course] [measured] [derived] [estimate]
 check_values(cfg)  settings that cannot work, or that probably will not
 describe(cfg)      the numbers a person wants to see (block size, margins, mass)
+apply_overrides(cfg, items)   NAME=VALUE overrides for one run (run_one_trial.py --set); config.py is unchanged
 """
 
+import ast
 import re
 from pathlib import Path
 
@@ -84,3 +86,18 @@ def describe(cfg) -> str:
         f"robot         : base mode {cfg.BASE_MODE}, {len(cfg.STATION_ANGLES_DEG)} stations at {cfg.STATION_STANDOFF_M} m",
         f"run           : method {cfg.EXTRACTION_METHOD}, strategy {cfg.STRATEGY}, mover {cfg.MOVER}, contact {cfg.CONTACT_MODEL}",
     ])
+
+
+def apply_overrides(cfg, items) -> list:
+    """Set config values for this run only, from strings like "RB_W_HEIGHT=-1.0" (a cluster job's --set).
+    The value is read as a Python literal (number, string, tuple, True/False).  Only existing settings can be
+    overridden, so a typo stops the run instead of being ignored.  Returns the (name, value) pairs applied."""
+    applied = []
+    for item in items:
+        name, sep, text = item.partition("=")
+        if not sep or not hasattr(cfg, name):
+            raise ValueError(f"--set {item!r}: expected NAME=VALUE with NAME a setting in config.py")
+        value = ast.literal_eval(text)
+        setattr(cfg, name, value)
+        applied.append((name, value))
+    return applied

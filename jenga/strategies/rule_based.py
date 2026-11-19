@@ -80,14 +80,19 @@ def layerscore(tower, layers,cfg):
         layer_below = max((l for l in range(toplayer+1) if l < candidatelayer), default=None)
         scores[candidatelayer] = 0
         # each score scaled from 0 to 1, using sigmoid for distances
-        height = 1-candidatelayer/toplayer #it gets more points for being lower (more weight on top: end-pinch moved the tower less)
+        height = candidatelayer/toplayer #it gets more points for being higher
+        fulllayerself = 1.0*threeblocksleft(tower,candidatelayer) #layer still has all three blocks
+        topfull = tower.highest_complete_layer()
+        cleartop = 0.0 if topfull is not None and candidatelayer == topfull - 1 else 1.0 #not the layer the top rests on
         fulllayersnear = 0.5*(threeblocksleft(tower,layer_above)+threeblocksleft(tower,layer_below))
         selfstill = 1/(1+layerdisturbance(tower,candidatelayer,cfg))
         othernearstill = 1/(1+layerdisturbance(tower,layer_above,cfg)+layerdisturbance(tower,layer_below,cfg))
         scores[candidatelayer] = (cfg.RB_W_HEIGHT    * height
                                 + cfg.RB_W_FULL_LAYERS_NEAR * fulllayersnear
                                 + cfg.RB_W_SELFSTILL     * selfstill
-                                + cfg.RB_W_OTHERNEARSTILL      * othernearstill)
+                                + cfg.RB_W_OTHERNEARSTILL      * othernearstill
+                                + cfg.RB_W_SELF_FULL     * fulllayerself
+                                + cfg.RB_W_CLEAR_OF_TOP  * cleartop)
     return scores
 
 def blockscore(tower, candidates, cfg):
@@ -115,9 +120,9 @@ def select_block(tower, candidates, cfg, rng, sensors=None) -> int:
     if not safecands:
         safecands = list(candidates)
     layers = sorted({tower.blocks[candidate].layer for candidate in safecands})
-    layers_3bl = [layer for layer in layers if threeblocksleft(tower,layer)]
-    pool = layers_3bl if layers_3bl else layers
-    layscore = layerscore(tower,pool,cfg)
+    #layers_3bl = [layer for layer in layers if threeblocksleft(tower,layer)]
+    #pool = layers_3bl if layers_3bl else layers
+    layscore = layerscore(tower,layers,cfg)
 
     best = max(layscore.values())
     toplayers = [l for l, s in layscore.items() if s >= best - cfg.RB_LAYER_TIE]

@@ -93,14 +93,17 @@ JOINT_LIMIT_WARN_RAD = 0.05  # [estimate] warn if an arm joint ends this close t
 # ------------------------------------------------------------------ turn outcomes and collapse
 COLLAPSE_DISPLACEMENT_M = 0.02  # [estimate] any other block moving more than this ends the trial
 PLACE_TOLERANCE_M = 0.02  # [estimate] a block this close to its target slot counts as replaced
+PLACE_CORRECT_GRASP = True  # [user] before a place, read where the block sits in the hand (simulator truth; a real robot needs a camera) and shift the aim by the offset: it slid 3-6 mm during the base roll (measured, Mac, 3 turns; D-08)
 PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pulled out
 
 # ------------------------------------------------------------------ rule-based strategy (jenga/strategies/rule_based.py)
 # Each factor is scored about 0 to 1; a weight says how much it counts.  0 turns a factor off.
-RB_W_HEIGHT = 3.0  # [estimate] (Katie: 3x the other layer terms) layer: prefer LOWER layers (end-pinch on a fresh 6-layer tower moved it < 1 mm from layers 0-2, ~2.7 mm from 3, collapsed it from 4; measured, Mac, 7 blocks)
+RB_W_HEIGHT = 1.0  # [estimate] layer: prefer HIGHER layers (with the 0.1 s pull a fresh 6-layer tower moved 1.6-2.6 mm pulling from layers 3-4, no collapse; at 1.0 s layer 4 collapsed it; measured, Mac, 4 blocks)
 RB_W_FULL_LAYERS_NEAR = 1.0  # [estimate] layer: prefer layers whose neighbours above and below are still full
 RB_W_SELFSTILL = 1.0  # [estimate] layer: prefer layers whose blocks have not moved from their slots
 RB_W_OTHERNEARSTILL = 1.0  # [estimate] layer: prefer layers whose neighbour layers have not moved
+RB_W_SELF_FULL = 1.5  # [estimate] layer: prefer layers that still have all three blocks (was a hard filter: it forced layer-3 pulls)
+RB_W_CLEAR_OF_TOP = 2.0  # [estimate] layer: avoid the layer right under the highest complete layer (pulling block 12 from layer 4 under full layer 5 dropped the top: Mac, 1 run; on a fresh tower it was fine)
 RB_LAYER_TIE = 0.1  # [estimate] layers scoring within this of the best are tied; one is chosen at random
 RB_W_EDGE = 1.0  # [estimate] block: prefer edge blocks (only matters for push; end-pinch takes edges only)
 RB_W_BALANCED = 1.0  # [estimate] block: prefer pulls that keep the support below the layer balanced

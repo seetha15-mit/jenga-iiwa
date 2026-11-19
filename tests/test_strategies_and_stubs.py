@@ -69,12 +69,33 @@ class TestRuleBased(unittest.TestCase):
         self.t.place(1, 3, 0)  # layer 0: only the edges 0 and 2 left, neither is safe to pull
         self.assertIn(select(self.t, [0, 2], self.cfg, np.random.default_rng(0)), (0, 2))
 
-    def test_height_rule_prefers_lower_layers(self):
+    def test_height_rule_prefers_higher_layers(self):
         from jenga.strategies import rule_based
         only_height = make_cfg(N_LAYERS_START=3, RB_W_HEIGHT=1.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
-                               RB_W_OTHERNEARSTILL=0.0)
+                               RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=0.0)
         s = rule_based.layerscore(self.t, [0, 1], only_height)
-        self.assertGreater(s[0], s[1])
+        self.assertGreater(s[1], s[0])
+
+    def test_the_layer_under_the_top_is_scored_down(self):
+        from jenga.strategies import rule_based
+        only_top = make_cfg(N_LAYERS_START=3, RB_W_HEIGHT=0.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
+                            RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=2.0)
+        s = rule_based.layerscore(self.t, [0, 1], only_top)  # layer 2 is the highest complete: layer 1 is under it
+        self.assertEqual((s[0], s[1]), (2.0, 0.0))
+        for b, slot in ((0, 0), (2, 2), (1, 1)):  # complete layer 3 (from layer 0's blocks): layer 2 is now under the top
+            self.t.place(b, 3, slot)
+        s = rule_based.layerscore(self.t, [1, 2], only_top)
+        self.assertEqual((s[1], s[2]), (2.0, 0.0))
+
+    def test_full_layer_is_a_weighted_term_not_a_filter(self):
+        from jenga.strategies import rule_based
+        self.t.place(0, 3, 0)  # layer 0 now has two blocks (1, 2); layer 1 is still full; top layer is 3
+        only = dict(N_LAYERS_START=3, RB_W_HEIGHT=0.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
+                    RB_W_OTHERNEARSTILL=0.0, RB_W_CLEAR_OF_TOP=0.0)
+        full_wins = rule_based.layerscore(self.t, [0, 1], make_cfg(RB_W_SELF_FULL=1.0, **only))
+        self.assertGreater(full_wins[1], full_wins[0])  # only "full" counts: the full layer 1
+        selfcands = [0, 1]  # layer 0 (two blocks) can still be chosen: it is scored, not filtered out
+        self.assertEqual(sorted(rule_based.layerscore(self.t, selfcands, make_cfg(RB_W_SELF_FULL=1.0, **only))), [0, 1])
 
     def test_reproducible_with_the_same_seed(self):
         select = strategies.get_strategy("rule_based")

@@ -12,8 +12,36 @@ Both take a `world` (jenga.scene.Sim, or a stand-in with the same few methods in
 
 from dataclasses import dataclass
 
+import numpy as np
+
 from jenga import base, clearance, executor_api  # noqa: F401  (executor_api: lazy Drake import point)
 from jenga import methods
+
+
+def _mat(X) -> np.ndarray:
+    return np.asarray(X.GetAsMatrix4() if hasattr(X, "GetAsMatrix4") else X, dtype=float)
+
+
+def release_index(waypoints, cfg):
+    """Index of the first waypoint whose opening is wider than the one before: the hand's release pose.
+    None if the fingers never open."""
+    widths = [cfg.FINGER_OPEN_COMMAND_M if w.opening is None else w.opening for w in waypoints]
+    return next((i for i in range(1, len(widths)) if widths[i] > widths[i - 1]), None)
+
+
+def grasp_corrected_target(X_RT, X_RG_release, X_RG_now, X_RB_now) -> np.ndarray:
+    """The place target to hand plan_place so the block lands at X_RT although it sits off-centre in the hand.
+
+    plan_place assumes the block is at X_GB = inv(X_RG_release) X_RT in the hand; it is really at
+    inv(X_RG_now) X_RB_now.  Moving the target by minus that offset (turned into the robot frame at the
+    release) moves the hand, and so the block, back onto the slot.  Translation only: a tilt in the hand is not
+    corrected.  All 4x4 robot-frame poses; plan_place must move rigidly with its target (end_pinch's does)."""
+    X_RT, X_RG_release = _mat(X_RT), _mat(X_RG_release)
+    assumed = (np.linalg.inv(X_RG_release) @ X_RT)[:3, 3]
+    actual = (np.linalg.inv(_mat(X_RG_now)) @ _mat(X_RB_now))[:3, 3]
+    out = X_RT.copy()
+    out[:3, 3] -= X_RG_release[:3, :3] @ (actual - assumed)
+    return out
 
 
 @dataclass
@@ -81,8 +109,15 @@ class RealMover:
         # ---- place (the block stays in the hand while the base rolls)
         k_place = method.choose_place_station(tower, layer, slot, cfg, world.station)
         ex.move_base_to_station(world, k_place, tuck=False)  # no tuck before the place: the arm resets before each pull/push (O-5)
-        ex.run_plan(world, method.plan_place(in_R(tower.target_pose(layer, slot)), cfg), cfg.WAYPOINT_SPEED_MS,
-                    label="place")
+        X_RT = in_R(tower.target_pose(layer, slot))
+        wps = method.plan_place(X_RT, cfg)
+        i = release_index(wps, cfg) if cfg.PLACE_CORRECT_GRASP else None
+        if i is not None:  # aim the block, not the hand: it slides in the pads during the roll (D-08)
+            X_RT = RigidTransform(grasp_corrected_target(
+                X_RT, wps[i].X_RG, world.kin.gripper_pose(world.arm_q()),
+                base.to_robot_frame(world.X_WR(), world.block_poses()[block_id])))
+            wps = method.plan_place(X_RT, cfg)
+        ex.run_plan(world, wps, cfg.WAYPOINT_SPEED_MS, label="place")
         return TurnInfo(k_pull, k_place)
 
 

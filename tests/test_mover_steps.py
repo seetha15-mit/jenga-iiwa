@@ -44,9 +44,46 @@ class FakeWorld:
         return {b: X.copy() for b, X in self.poses.items()}
 
 
+def _pose(yaw, xyz):
+    X = np.eye(4)
+    c, s = np.cos(yaw), np.sin(yaw)
+    X[:3, :3] = [[c, -s, 0], [s, c, 0], [0, 0, 1]]
+    X[:3, 3] = xyz
+    return X
+
+
+class TestGraspCorrection(unittest.TestCase):
+    """Aim the block, not the hand (D-08): pure numpy, no Drake."""
+
+    def test_the_block_lands_on_the_target_despite_an_offset_in_the_hand(self):
+        X_RT = _pose(0.3, [0.9, 0.05, 0.25])  # where the block should land
+        X_RG_rel = _pose(1.2, [0.85, 0.1, 0.30])  # the plan's release hand pose for X_RT
+        X_GB_actual = np.linalg.inv(X_RG_rel) @ X_RT
+        X_GB_actual[:3, 3] += [0.001, 0.006, -0.0005]  # the block slid 6 mm along the reach axis
+        X_RG_now = _pose(-0.7, [0.4, -0.2, 0.5])  # the hand is somewhere else now (carry pose)
+        X_RT_new = mover.grasp_corrected_target(X_RT, X_RG_rel, X_RG_now, X_RG_now @ X_GB_actual)
+        X_RG_rel_new = X_RG_rel.copy()
+        X_RG_rel_new[:3, 3] += X_RT_new[:3, 3] - X_RT[:3, 3]  # the plan moves rigidly with its target
+        np.testing.assert_allclose((X_RG_rel_new @ X_GB_actual)[:3, 3], X_RT[:3, 3], atol=1e-12)
+        np.testing.assert_allclose(X_RT_new[:3, :3], X_RT[:3, :3])
+
+    def test_no_offset_no_change(self):
+        X_RT, X_RG_rel = _pose(0.3, [0.9, 0.05, 0.25]), _pose(1.2, [0.85, 0.1, 0.30])
+        X_RB = X_RT.copy()
+        np.testing.assert_allclose(mover.grasp_corrected_target(X_RT, X_RG_rel, X_RG_rel, X_RB), X_RT)
+
+    def test_release_is_the_first_wider_opening(self):
+        from jenga.waypoint import Waypoint
+        cfg = make_cfg()
+        wps = [Waypoint(None, 0.07), Waypoint(None, 0.07), Waypoint(None, 0.11), Waypoint(None, None)]
+        self.assertEqual(mover.release_index(wps, cfg), 2)
+        self.assertIsNone(mover.release_index(wps[:2], cfg))
+
+
 @unittest.skipUnless(HAVE_DRAKE, "needs pydrake")
 class TestRealMoverSteps(unittest.TestCase):
     def run_turn(self, cfg, method, block_id, place_station):
+        cfg.PLACE_CORRECT_GRASP = False  # the recorded plans are not waypoints and FakeWorld has no arm
         tower = TowerState(cfg)
         world, ex = FakeWorld(cfg, tower), FakeExecutor()
         plans = {name: mock.patch.object(method, name, return_value=["wp"])
