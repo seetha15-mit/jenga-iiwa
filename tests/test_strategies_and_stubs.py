@@ -69,12 +69,12 @@ class TestRuleBased(unittest.TestCase):
         self.t.place(1, 3, 0)  # layer 0: only the edges 0 and 2 left, neither is safe to pull
         self.assertIn(select(self.t, [0, 2], self.cfg, np.random.default_rng(0)), (0, 2))
 
-    def test_height_rule_prefers_higher_layers(self):
+    def test_height_rule_prefers_lower_layers(self):
         from jenga.strategies import rule_based
         only_height = make_cfg(N_LAYERS_START=3, RB_W_HEIGHT=1.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
                                RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=0.0)
         s = rule_based.layerscore(self.t, [0, 1], only_height)
-        self.assertGreater(s[1], s[0])
+        self.assertGreater(s[0], s[1])
 
     def test_the_layer_under_the_top_is_scored_down(self):
         from jenga.strategies import rule_based

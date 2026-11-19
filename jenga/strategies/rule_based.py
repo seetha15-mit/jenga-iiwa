@@ -80,7 +80,7 @@ def layerscore(tower, layers,cfg):
         layer_below = max((l for l in range(toplayer+1) if l < candidatelayer), default=None)
         scores[candidatelayer] = 0
         # each score scaled from 0 to 1, using sigmoid for distances
-        height = candidatelayer/toplayer #it gets more points for being higher
+        height = 1-candidatelayer/toplayer #it gets more points for being lower
         fulllayerself = 1.0*threeblocksleft(tower,candidatelayer) #layer still has all three blocks
         topfull = tower.highest_complete_layer()
         cleartop = 0.0 if topfull is not None and candidatelayer == topfull - 1 else 1.0 #not the layer the top rests on
