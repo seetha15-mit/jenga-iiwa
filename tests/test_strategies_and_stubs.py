@@ -97,6 +97,22 @@ class TestRuleBased(unittest.TestCase):
         selfcands = [0, 1]  # layer 0 (two blocks) can still be chosen: it is scored, not filtered out
         self.assertEqual(sorted(rule_based.layerscore(self.t, selfcands, make_cfg(RB_W_SELF_FULL=1.0, **only))), [0, 1])
 
+    def test_clear_of_top_can_cover_two_layers(self):
+        from jenga.strategies import rule_based
+        only = dict(N_LAYERS_START=3, RB_W_HEIGHT=0.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
+                    RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=2.0, RB_W_CLEAR_OF_BOTTOM=0.0)
+        s1 = rule_based.layerscore(self.t, [0, 1], make_cfg(RB_CLEAR_OF_TOP_LAYERS=1, **only))  # top full layer is 2
+        self.assertEqual((s1[0], s1[1]), (2.0, 0.0))
+        s2 = rule_based.layerscore(self.t, [0, 1], make_cfg(RB_CLEAR_OF_TOP_LAYERS=2, **only))
+        self.assertEqual((s2[0], s2[1]), (0.0, 0.0))
+
+    def test_clear_of_bottom_affects_layer_0_only(self):
+        from jenga.strategies import rule_based
+        cfg = make_cfg(N_LAYERS_START=3, RB_W_HEIGHT=0.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
+                       RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=0.0, RB_W_CLEAR_OF_BOTTOM=2.0)
+        s = rule_based.layerscore(self.t, [0, 1], cfg)
+        self.assertEqual((s[0], s[1]), (0.0, 2.0))
+
     def test_reproducible_with_the_same_seed(self):
         select = strategies.get_strategy("rule_based")
         cands = [0, 2, 3, 5]

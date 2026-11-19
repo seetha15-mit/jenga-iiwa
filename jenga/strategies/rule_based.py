@@ -83,7 +83,8 @@ def layerscore(tower, layers,cfg):
         height = 1-candidatelayer/toplayer #it gets more points for being lower
         fulllayerself = 1.0*threeblocksleft(tower,candidatelayer) #layer still has all three blocks
         topfull = tower.highest_complete_layer()
-        cleartop = 0.0 if topfull is not None and candidatelayer == topfull - 1 else 1.0 #not the layer the top rests on
+        cleartop = 0.0 if topfull is not None and candidatelayer >= topfull - cfg.RB_CLEAR_OF_TOP_LAYERS else 1.0 #not the layer(s) the top rests on
+        clearbottom = 0.0 if candidatelayer == 0 else 1.0 #not the bottom layer (layer 1 is not affected)
         fulllayersnear = 0.5*(threeblocksleft(tower,layer_above)+threeblocksleft(tower,layer_below))
         selfstill = 1/(1+layerdisturbance(tower,candidatelayer,cfg))
         othernearstill = 1/(1+layerdisturbance(tower,layer_above,cfg)+layerdisturbance(tower,layer_below,cfg))
@@ -92,7 +93,8 @@ def layerscore(tower, layers,cfg):
                                 + cfg.RB_W_SELFSTILL     * selfstill
                                 + cfg.RB_W_OTHERNEARSTILL      * othernearstill
                                 + cfg.RB_W_SELF_FULL     * fulllayerself
-                                + cfg.RB_W_CLEAR_OF_TOP  * cleartop)
+                                + cfg.RB_W_CLEAR_OF_TOP  * cleartop
+                                + cfg.RB_W_CLEAR_OF_BOTTOM * clearbottom)
     return scores
 
 def blockscore(tower, candidates, cfg):

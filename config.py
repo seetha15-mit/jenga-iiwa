@@ -105,6 +105,8 @@ RB_W_SELFSTILL = 1.0  # [estimate] layer: prefer layers whose blocks have not mo
 RB_W_OTHERNEARSTILL = 1.0  # [estimate] layer: prefer layers whose neighbour layers have not moved
 RB_W_SELF_FULL = 1.5  # [estimate] layer: prefer layers that still have all three blocks (was a hard filter: it forced layer-3 pulls)
 RB_W_CLEAR_OF_TOP = 2.0  # [estimate] layer: avoid the layer right under the highest complete layer (pulling block 12 from layer 4 under full layer 5 dropped the top: Mac, 1 run; on a fresh tower it was fine)
+RB_CLEAR_OF_TOP_LAYERS = 1  # [estimate] how many layers under the highest complete layer count for RB_W_CLEAR_OF_TOP (B pulled layer 4 right after layer 6 filled and collapsed: 5 of 5 of random's best trials; cluster)
+RB_W_CLEAR_OF_BOTTOM = 0.0  # [estimate] layer: avoid layer 0 only (0 = off; B emptied layers 0-1 first in the same 5 trials, random's long games rarely touched layer 0)
 RB_LAYER_TIE = 0.1  # [estimate] layers scoring within this of the best are tied; one is chosen at random
 RB_W_EDGE = 1.0  # [estimate] block: prefer edge blocks (only matters for push; end-pinch takes edges only)
 RB_W_BALANCED = 1.0  # [estimate] block: prefer pulls that keep the support below the layer balanced
