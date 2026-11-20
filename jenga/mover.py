@@ -29,12 +29,16 @@ def release_index(waypoints, cfg):
     return next((i for i in range(1, len(widths)) if widths[i] > widths[i - 1]), None)
 
 
-def release_target(tower, layer, slot, cfg) -> np.ndarray:
-    """The slot's pose raised by PLACE_RELEASE_LIFT_M (world z): where plan_place is told to let go, so the hand is
-    not pressing the block into the layer below when the fingers open.  Raised here, before the grasp correction,
-    so the correction keeps the lift instead of cancelling it."""
+def release_target(tower, layer, slot, poses, cfg, held=None) -> np.ndarray:
+    """The slot's pose with its height set to the MEASURED top of the layer below (mean bottom face of the blocks
+    there + one block height), not the built height: the tower is built with a gap between layers and settles, so
+    the built height sits above the real top by more each layer (D-25).  poses: block id -> 4x4 world pose
+    (simulator truth, as for the grasp correction; a real robot would need to sense the top).  held: the block in
+    the hand, never counted."""
     X = np.array(tower.target_pose(layer, slot), dtype=float)
-    X[2, 3] += cfg.PLACE_RELEASE_LIFT_M
+    below = [b for b in tower.layer_blocks(layer - 1) if b != held] if layer > 0 else []
+    if below:
+        X[2, 3] = np.mean([poses[b][2, 3] for b in below]) + tower.dims[2]
     return X
 
 
@@ -118,7 +122,7 @@ class RealMover:
         # ---- place (the block stays in the hand while the base rolls)
         k_place = method.choose_place_station(tower, layer, slot, cfg, world.station)
         ex.move_base_to_station(world, k_place, tuck=False)  # no tuck before the place: the arm resets before each pull/push (O-5)
-        X_RT = in_R(release_target(tower, layer, slot, cfg))
+        X_RT = in_R(release_target(tower, layer, slot, world.block_poses(), cfg, held=block_id))
         wps = method.plan_place(X_RT, cfg)
         i = release_index(wps, cfg) if cfg.PLACE_CORRECT_GRASP else None
         if i is not None:  # aim the block, not the hand: it slides in the pads during the roll (D-08)

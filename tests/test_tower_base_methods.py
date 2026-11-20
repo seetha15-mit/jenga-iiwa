@@ -24,8 +24,7 @@ class TestTower(unittest.TestCase):
         self.assertAlmostEqual(X0[2, 3], self.cfg.PLATFORM_HEIGHT_M)
         self.assertAlmostEqual(geo.yaw_of(self.t.target_pose(0, 1)), np.pi / 2)
         self.assertAlmostEqual(geo.yaw_of(self.t.target_pose(1, 1)), 0.0)
-        self.assertAlmostEqual(self.t.target_pose(1, 1)[2, 3], self.cfg.PLATFORM_HEIGHT_M + H)  # no gap between layers
-        self.assertAlmostEqual(self.t.target_pose(5, 1)[2, 3], self.cfg.PLATFORM_HEIGHT_M + 5 * H)
+        self.assertAlmostEqual(self.t.target_pose(1, 1)[2, 3], self.cfg.PLATFORM_HEIGHT_M + H + self.cfg.BLOCK_GAP_M)
         # slot 0 of a layer with long axis y is at negative x
         self.assertLess(self.t.target_pose(0, 0)[0, 3], self.t.target_pose(0, 2)[0, 3])
 

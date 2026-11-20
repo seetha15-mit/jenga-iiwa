@@ -63,7 +63,7 @@ def check_reachability(cfg, shared):
     lines, bad = [], []
     q_ref = np.array(cfg.ARM_CARRY_Q, float)
     for i in range(cfg.REACH_CHECK_LAYERS + 1):  # the last one is the placement level on top
-        z = cfg.PLATFORM_HEIGHT_M + i * H + H / 2 - cfg.BASE_MOUNT_HEIGHT_M  # layers stack with no gap (D-25)
+        z = cfg.PLATFORM_HEIGHT_M + i * (H + gap) + H / 2 - cfg.BASE_MOUNT_HEIGHT_M
         best, best_detail = -1.0, {}
         for R in (RA, RB):
             margins = {}

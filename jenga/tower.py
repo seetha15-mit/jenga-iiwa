@@ -53,14 +53,14 @@ class TowerState:
         return np.array([1.0, 0.0]) if self.long_axis(layer) == "y" else np.array([0.0, 1.0])
 
     def target_pose(self, layer: int, slot: int) -> np.ndarray:
-        """4x4 world pose of the block body frame (bottom-face centre) at (layer, slot).
-        Layers stack with no gap (blocks rest on each other); BLOCK_GAP_M is only between neighbours in a layer.
-        With a gap between layers too, the place target drifted ~0.6-1 mm per layer above the real top (D-25)."""
+        """4x4 world pose of the block body frame (bottom-face centre) at (layer, slot), with BLOCK_GAP_M between
+        neighbours and between layers: the tower is BUILT this way and settles onto itself.  Places do not aim here
+        in height: mover.release_target aims at the measured top of the layer below (D-25)."""
         L, W, H = self.dims
         gap = self.cfg.BLOCK_GAP_M
         cx, cy = self.cfg.TOWER_CENTER_XY
         across = (slot - 1) * (W + gap)
-        z = self.cfg.PLATFORM_HEIGHT_M + layer * H
+        z = self.cfg.PLATFORM_HEIGHT_M + layer * (H + gap)
         if self.long_axis(layer) == "y":  # body x along world y: yaw 90 deg, blocks side by side along x
             return geo.make_pose(cx + across, cy, z, np.pi / 2)
         return geo.make_pose(cx, cy + across, z, 0.0)
