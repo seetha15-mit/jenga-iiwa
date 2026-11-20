@@ -29,6 +29,15 @@ def release_index(waypoints, cfg):
     return next((i for i in range(1, len(widths)) if widths[i] > widths[i - 1]), None)
 
 
+def release_target(tower, layer, slot, cfg) -> np.ndarray:
+    """The slot's pose raised by PLACE_RELEASE_LIFT_M (world z): where plan_place is told to let go, so the hand is
+    not pressing the block into the layer below when the fingers open.  Raised here, before the grasp correction,
+    so the correction keeps the lift instead of cancelling it."""
+    X = np.array(tower.target_pose(layer, slot), dtype=float)
+    X[2, 3] += cfg.PLACE_RELEASE_LIFT_M
+    return X
+
+
 def grasp_corrected_target(X_RT, X_RG_release, X_RG_now, X_RB_now) -> np.ndarray:
     """The place target to hand plan_place so the block lands at X_RT although it sits off-centre in the hand.
 
@@ -109,7 +118,7 @@ class RealMover:
         # ---- place (the block stays in the hand while the base rolls)
         k_place = method.choose_place_station(tower, layer, slot, cfg, world.station)
         ex.move_base_to_station(world, k_place, tuck=False)  # no tuck before the place: the arm resets before each pull/push (O-5)
-        X_RT = in_R(tower.target_pose(layer, slot))
+        X_RT = in_R(release_target(tower, layer, slot, cfg))
         wps = method.plan_place(X_RT, cfg)
         i = release_index(wps, cfg) if cfg.PLACE_CORRECT_GRASP else None
         if i is not None:  # aim the block, not the hand: it slides in the pads during the roll (D-08)

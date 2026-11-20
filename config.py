@@ -94,6 +94,7 @@ JOINT_LIMIT_WARN_RAD = 0.05  # [estimate] warn if an arm joint ends this close t
 # ------------------------------------------------------------------ turn outcomes and collapse
 COLLAPSE_DISPLACEMENT_M = 0.02  # [estimate] any other block moving more than this ends the trial
 PLACE_TOLERANCE_M = 0.02  # [estimate] a block this close to its target slot counts as replaced
+PLACE_RELEASE_LIFT_M = 0.001  # [estimate] let go of a placed block this far above its resting height, so the hand is not pressing it into the layer below when the fingers open (trial 77: the hand jumped ~1.2 mm on every release; applied in mover.release_target; D-25)
 PLACE_CORRECT_GRASP = True  # [user] before a place, read where the block sits in the hand (simulator truth; a real robot needs a camera) and shift the aim by the offset: it slid 3-6 mm during the base roll (measured, Mac, 3 turns; D-08)
 PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pulled out
 
