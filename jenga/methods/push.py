@@ -96,12 +96,17 @@ def plan_pull(X_RB, cfg):
     
     pickpoint = X_RB@X_BG
     pickpounce = pickpoint@offset
+    # the pull-out in two parts on one straight line: while the block is still in the tower (0.6 L after a 0.4 L
+    # push, plus 10 mm) at PULL_INSIDE_SPEED_MS, then the rest at PULL_OUT_SPEED_MS
+    inside_m = 0.6*L + 0.010
+    clear = pickpoint@RigidTransform([0,-inside_m,0])
     wayplist = []
     wayplist.append(Waypoint(pickpounce, cfg.FINGER_OPEN_COMMAND_M))     # 1. get near, open
     wayplist.append(Waypoint(pickpoint,  cfg.FINGER_OPEN_COMMAND_M))
     wayplist.append(Waypoint(pickpoint,  W-1.75*cfg.FINGER_SQUEEZE_M))
     wayplist.append(Waypoint(pickpoint@lift,  W-1.75*cfg.FINGER_SQUEEZE_M,1))      # 2. move onto the block
-    wayplist.append(Waypoint(pickpounce@lift, W-1.75*cfg.FINGER_SQUEEZE_M))
+    wayplist.append(Waypoint(clear@lift, W-1.75*cfg.FINGER_SQUEEZE_M, inside_m/cfg.PULL_INSIDE_SPEED_MS))
+    wayplist.append(Waypoint(pickpounce@lift, W-1.75*cfg.FINGER_SQUEEZE_M, (0.2-inside_m)/cfg.PULL_OUT_SPEED_MS))
     wayplist.append(Waypoint(pickpounce@upoffset, W-1.75*cfg.FINGER_SQUEEZE_M))
     return wayplist
 

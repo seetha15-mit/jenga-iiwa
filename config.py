@@ -91,6 +91,8 @@ JOINT_SPEED_RAD_S = 0.5  # [estimate] speed of joint-space moves
 HOLD_AFTER_MOTION_S = 0.3  # [estimate] stand still this long after each motion
 SAMPLE_DT_S = 0.02  # [estimate] how often to log wrist force during a motion
 TRACKING_WARN_M = 0.005  # [estimate] warn if the hand ends this far from its last waypoint
+PULL_INSIDE_SPEED_MS = 0.02  # [measured] push method's pull-out while the block is still in the tower (push.plan_pull). Of the speeds tested (0.02, 0.03, 0.05, 0.07, 0.1 m/s; middle blocks of layers 0-4, both ends), 0.02 is the only one where the layer above moved at most ~1 mm in every run (1.1 mm); 0.03 gave 3.4 mm on layer 4, 0.1 up to 251 mm. Faster pulls track worse, so the block tips more in the hand. Layer 4 near end collapses at every speed
+PULL_OUT_SPEED_MS = 0.1  # [estimate] the rest of the push method's 200 mm pull-out; 0.1 = as before
 CHECK_SWING_CLEARANCE = False  # [user] joint-space moves take the first IK solution (in the usual order) whose path keeps the gripper and held block SWING_CLEARANCE_M clear (jenga/clearance.py); False = the old choice exactly
 SWING_CLEARANCE_M = 0.010  # [estimate] wanted clearance on a swing; must stay above what the 10 mm point spacing can miss (about 7 mm, clearance.GRID_M); every logged pedestal swing has an IK solution clear by this (kinematic estimate, push sweep)
 SWING_CHECK_STEP_RAD = 0.035  # [estimate] a swing's path is checked every 2 degrees of its largest joint turn
