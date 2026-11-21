@@ -28,7 +28,7 @@ class FakeExecutor:
         world.station = k
         self.log.append(("base", k) if tuck else ("base, no tuck", k))
 
-    def run_plan(self, world, waypoints, speed, label=""):
+    def run_plan(self, world, waypoints, speed, label="", held=None):
         self.log.append((label, world.station))
 
 

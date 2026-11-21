@@ -60,15 +60,21 @@ def plan_push(X_RB, cfg):
     X_BG = RigidTransform(R_BG,[-L/2-cfg.FINGERTIP_REACH_M,cfg.PAD_CENTRE_FROM_G_M/2,0.5*H])
     offset = RigidTransform([0,-0.1,0])
     upoffset = RigidTransform([0,0,-0.3])
-    push = RigidTransform([0,0.4*L,0])
+    push_m, push_s = 0.4*L, 2.0
+    push = RigidTransform([0,push_m,0])
+    clear_m = 0.010                                  # [estimate] fingertips this far outside the tower face before speeding up
+    clear = RigidTransform([0,-clear_m,0])
     pickpoint = X_RB@X_BG
     pickpounce = pickpoint@offset
     pickpush = pickpoint@push
     wayplist = []
     wayplist.append(Waypoint(pickpounce, cfg.FINGER_OPEN_COMMAND_M))     # 1. get near, open
     wayplist.append(Waypoint(pickpoint,  cfg.FINGER_OPEN_COMMAND_M))
-    wayplist.append(Waypoint(pickpush,  cfg.FINGER_OPEN_COMMAND_M,2))     # 2. move onto the block
-    wayplist.append(Waypoint(pickpounce, cfg.FINGER_OPEN_COMMAND_M))   # 4. retreat holding it
+    wayplist.append(Waypoint(pickpush,  cfg.FINGER_OPEN_COMMAND_M,push_s))     # 2. push the block
+    # 3. back out of the slot at the push's own speed: at full speed the hand ended 1.3 mm low and dragged the
+    # layer below 26 mm (block 10, push sweep rerun, measured); speed up only once the fingertips are outside
+    wayplist.append(Waypoint(pickpoint@clear, cfg.FINGER_OPEN_COMMAND_M, (push_m + clear_m) * push_s / push_m))
+    wayplist.append(Waypoint(pickpounce, cfg.FINGER_OPEN_COMMAND_M))   # 4. retreat
     wayplist.append(Waypoint(pickpounce@upoffset,cfg.FINGER_OPEN_COMMAND_M))
     return wayplist
 

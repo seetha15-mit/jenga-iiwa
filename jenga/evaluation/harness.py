@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from jenga import clearance, geometry as geo, methods, strategies
+from jenga import clearance, diaglog, geometry as geo, methods, strategies
 from jenga.errors import MotionFailed
 from jenga.evaluation import collapse, outcomes
 from jenga.tower import TowerState
@@ -106,6 +106,11 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
 
         if turn == 0:
             block = int(first_pick_rng.choice(np.array(candidates)))  # course rule: first block is random
+            if cfg.DIAG_FIRST_BLOCK is not None:  # development only (R-03); drawn above anyway so the stream is unchanged
+                if cfg.DIAG_FIRST_BLOCK not in candidates:
+                    raise ValueError(f"DIAG_FIRST_BLOCK {cfg.DIAG_FIRST_BLOCK} is not a legal pull: {candidates}")
+                block = int(cfg.DIAG_FIRST_BLOCK)
+                log(f"[dev] first block forced to {block} (DIAG_FIRST_BLOCK): not a random pick, never for results")
             first_block = block
         else:
             block = int(select(tower, candidates, cfg, strategy_rng))
@@ -122,6 +127,13 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
             info = mover.do_turn(world, tower, block, target, cfg)
         except MotionFailed as e:  # a motion could not be done: logged as a failed turn
             mover_error = str(e)
+        dlog = getattr(mover, "last_diag", None)  # development log (DIAG_LOG_LEVEL > 0), written even after a failure
+        if dlog is not None:
+            ids = dict(trial=trial, turn=turn, block_id=block)
+            for r in dlog.rows:
+                _append_csv(out_dir / "steps.csv", list(ids) + dlog.columns, dict(ids, **r))
+            for r in dlog.block_rows:
+                _append_csv(out_dir / "step_blocks.csv", list(ids) + diaglog.BLOCK_COLUMNS, dict(ids, **r))
         after = world.block_poses()
         others = max(float(np.linalg.norm(after[b][:3, 3] - before[b][:3, 3])) for b in before if b != block)
         place_err = float(np.linalg.norm(after[block][:3, 3] - tower.target_pose(*target)[:3, 3]))

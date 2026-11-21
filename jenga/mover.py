@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from jenga import base, clearance, executor_api  # noqa: F401  (executor_api: lazy Drake import point)
+from jenga import base, clearance, diaglog, executor_api  # noqa: F401  (executor_api: lazy Drake import point)
 from jenga import methods
 
 
@@ -80,6 +80,7 @@ class FakeMover:
 
 class RealMover:
     TAG = "real"
+    last_diag = None  # the last turn's development log (jenga/diaglog.py), or None when it is off
 
     def banner(self) -> str:
         return ""
@@ -96,32 +97,51 @@ class RealMover:
         def in_R(X_WB):  # a world pose in the robot frame, where the base stands NOW
             return RigidTransform(base.to_robot_frame(world.X_WR(), X_WB))
 
+        dlog = diaglog.StepLog(world, tower, block_id, cfg) if cfg.DIAG_LOG_LEVEL > 0 else None
+        self.last_diag = dlog  # the harness writes its rows (steps.csv), also after a failed motion
+
+        def do(name, fn, *args, **kw):  # run one step; with the development log on, record what it did
+            if dlog:
+                dlog.begin_step()
+                if dlog.per_waypoint and fn is ex.run_plan:
+                    kw["on_waypoint"] = lambda i, wp: dlog.waypoint(name, i, wp)
+            try:
+                res = fn(*args, **kw)
+            except Exception as e:
+                if dlog:
+                    dlog.step(name, error=str(e))
+                raise
+            if dlog:
+                dlog.step(name, res)
+            return res
+
         if hasattr(method, "plan_push"):
             # ---- push (push method): from one end, the block slides part way out the far side
-            ex.move_base_to_station(world, method.choose_station(tower, block_id, cfg, world.station))
-            ex.run_plan(world, method.plan_push(in_R(tower.block_pose(block_id)), cfg), cfg.WAYPOINT_SPEED_MS,
-                        label="push")
+            do("roll_to_push", ex.move_base_to_station, world, method.choose_station(tower, block_id, cfg, world.station))
+            do("push", ex.run_plan, world, method.plan_push(in_R(tower.block_pose(block_id)), cfg), cfg.WAYPOINT_SPEED_MS,
+               label="push")
             # ---- pull from the far end, then regrab; the block has moved, so its pose is read again
             k_pull = method.choose_pull_station(tower, block_id, cfg, world.station)
-            ex.move_base_to_station(world, k_pull)
-            ex.run_plan(world, method.plan_pull(in_R(world.block_poses()[block_id]), cfg), cfg.WAYPOINT_SPEED_MS,
-                        label="pull")
+            do("roll_to_pull", ex.move_base_to_station, world, k_pull)
+            do("pull", ex.run_plan, world, method.plan_pull(in_R(world.block_poses()[block_id]), cfg),
+               cfg.WAYPOINT_SPEED_MS, label="pull")
             # ---- set it on a pedestal, then regrab it from where it actually landed (D-22); each is its own plan,
             # so each starts with a joint move (this clears the hand's drift before the regrab grasp)
-            ex.run_plan(world, method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg), cfg.WAYPOINT_SPEED_MS,
-                        label="pedestal")
-            ex.run_plan(world, method.plan_regrab(in_R(world.block_poses()[block_id]), cfg), cfg.WAYPOINT_SPEED_MS,
-                        label="regrab")
+            do("pedestal", ex.run_plan, world, method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg),
+               cfg.WAYPOINT_SPEED_MS, label="pedestal", held=block_id)
+            do("regrab", ex.run_plan, world, method.plan_regrab(in_R(world.block_poses()[block_id]), cfg),
+               cfg.WAYPOINT_SPEED_MS, label="regrab")
         else:
             # ---- pull
             k_pull = method.choose_station(tower, block_id, cfg, world.station)
-            ex.move_base_to_station(world, k_pull)
-            ex.run_plan(world, method.plan_pull(in_R(tower.block_pose(block_id)), cfg), cfg.WAYPOINT_SPEED_MS,
-                        label="pull")
+            do("roll_to_pull", ex.move_base_to_station, world, k_pull)
+            do("pull", ex.run_plan, world, method.plan_pull(in_R(tower.block_pose(block_id)), cfg),
+               cfg.WAYPOINT_SPEED_MS, label="pull")
 
         # ---- place (the block stays in the hand while the base rolls)
         k_place = method.choose_place_station(tower, layer, slot, cfg, world.station)
-        ex.move_base_to_station(world, k_place, tuck=False)  # no tuck before the place: the arm resets before each pull/push (O-5)
+        # no tuck before the place: the arm resets before each pull/push (O-5)
+        do("roll_to_place", ex.move_base_to_station, world, k_place, tuck=False)
         X_RT = in_R(release_target(tower, layer, slot, world.block_poses(), cfg, held=block_id))
         wps = method.plan_place(X_RT, cfg)
         i = release_index(wps, cfg) if cfg.PLACE_CORRECT_GRASP else None
@@ -130,7 +150,7 @@ class RealMover:
                 X_RT, wps[i].X_RG, world.kin.gripper_pose(world.arm_q()),
                 base.to_robot_frame(world.X_WR(), world.block_poses()[block_id])))
             wps = method.plan_place(X_RT, cfg)
-        ex.run_plan(world, wps, cfg.WAYPOINT_SPEED_MS, label="place")
+        do("place", ex.run_plan, world, wps, cfg.WAYPOINT_SPEED_MS, label="place", held=block_id)
         return TurnInfo(k_pull, k_place)
 
 

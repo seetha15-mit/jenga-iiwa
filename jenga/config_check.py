@@ -13,6 +13,7 @@ from pathlib import Path
 from jenga import geometry as geo
 
 TAGS = ("[user]", "[course]", "[measured]", "[derived]", "[estimate]")
+DIAG_FEATURES = ("block", "neighbours", "hand", "joints", "waypoints")  # what jenga/diaglog.py knows
 _ASSIGN = re.compile(r"^([A-Z][A-Z0-9_]*)\s*=")
 
 
@@ -34,7 +35,7 @@ def check_values(cfg) -> list:
         "COLLAPSE_DETECTOR": ("basic", "advanced"), "BASE_MODE": ("mobile", "fixed"),
         "CONTACT_MODEL": ("hydroelastic", "point"), "FRICTION_MODE": ("global", "random"),
         "CONTACT_APPROXIMATION": ("sap", "lagged", "similar", "default"),
-        "FIRST_LAYER_LONG_AXIS": ("x", "y"),
+        "FIRST_LAYER_LONG_AXIS": ("x", "y"), "DIAG_LOG_LEVEL": (0, 1, 2),
     }
     for name, allowed in choices.items():
         if getattr(cfg, name) not in allowed:
@@ -72,6 +73,11 @@ def check_values(cfg) -> list:
         w.append("BASE_TRAVEL_RADIUS_M is smaller than STATION_STANDOFF_M: the base would roll through the tower.")
     if len(cfg.STATION_ANGLES_DEG) < 1:
         w.append("STATION_ANGLES_DEG needs at least one station.")
+    unknown = set(cfg.DIAG_LOG_FEATURES) - set(DIAG_FEATURES)
+    if unknown:
+        w.append(f"DIAG_LOG_FEATURES has unknown names {sorted(unknown)}; known: {DIAG_FEATURES}.")
+    if cfg.DIAG_FIRST_BLOCK is not None:
+        w.append(f"DIAG_FIRST_BLOCK = {cfg.DIAG_FIRST_BLOCK}: the first pick is forced, not random (R-03). Development only, never results.")
     if cfg.MOVER == "fake":
         w.append("MOVER = 'fake': runs use the teleport placeholder and are INVALID for results (this is the default until the team's steps exist).")
     return w

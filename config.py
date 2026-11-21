@@ -40,6 +40,8 @@ HYDROELASTIC_MODULUS = 1.0e6  # [course] what the psets use for their boxes
 FINGER_OPEN_COMMAND_M = 0.110  # [measured] largest opening; the pad gap is this + 5 mm
 PAD_GAP_EXTRA_M = 0.005  # [measured] pad gap = command + 5 mm (pads never get closer than 5 mm)
 FINGER_HEIGHT_M = 0.020  # [measured] fingers and pads are 20 mm tall
+FINGER_THICKNESS_M = 0.012  # [measured] finger collision box along G x (schunk_wsg_50_with_tip.sdf: 0.012 x 0.082 x 0.02)
+PAD_THICKNESS_M = 0.003  # [measured] pad on the finger's inner face (same file: 0.003 x 0.02 x 0.02)
 FINGER_CLOSED_WIDTH_M = 0.035  # [measured] two closed fingers together
 PAD_CENTRE_FROM_G_M = 0.108  # [measured] distance from G to the middle of the pads along G y
 FINGERTIP_REACH_M = 0.118  # [measured] distance from G to the fingertips along G y
@@ -89,6 +91,9 @@ JOINT_SPEED_RAD_S = 0.5  # [estimate] speed of joint-space moves
 HOLD_AFTER_MOTION_S = 0.3  # [estimate] stand still this long after each motion
 SAMPLE_DT_S = 0.02  # [estimate] how often to log wrist force during a motion
 TRACKING_WARN_M = 0.005  # [estimate] warn if the hand ends this far from its last waypoint
+CHECK_SWING_CLEARANCE = False  # [user] joint-space moves take the first IK solution (in the usual order) whose path keeps the gripper and held block SWING_CLEARANCE_M clear (jenga/clearance.py); False = the old choice exactly
+SWING_CLEARANCE_M = 0.010  # [estimate] wanted clearance on a swing; must stay above what the 10 mm point spacing can miss (about 7 mm, clearance.GRID_M); every logged pedestal swing has an IK solution clear by this (kinematic estimate, push sweep)
+SWING_CHECK_STEP_RAD = 0.035  # [estimate] a swing's path is checked every 2 degrees of its largest joint turn
 JOINT_LIMIT_WARN_RAD = 0.05  # [estimate] warn if an arm joint ends this close to its limit
 
 # ------------------------------------------------------------------ turn outcomes and collapse
@@ -121,6 +126,11 @@ RUNS_DIR = "runs_scratch"  # [user] real results go here
 FAKE_RUNS_DIR = "runs_fake"  # [user] fake-mover runs go here, never into results
 ASSET_DIR = "generated_assets"  # [estimate] SDF files written at run time
 PRINT_SIM_SPEED = True  # [user] print simulated seconds per wall second
+
+# ------------------------------------------------------------------ development log (jenga/diaglog.py; off for results)
+DIAG_LOG_LEVEL = 0  # [user] 0 off; 1 one row per step of a turn (steps.csv); 2 also one row per block per step (step_blocks.csv)
+DIAG_LOG_FEATURES = ("block", "neighbours", "hand", "joints")  # [user] column groups in steps.csv; "waypoints" adds a row per waypoint (jenga/diaglog.py)
+DIAG_FIRST_BLOCK = None  # [user] development only: force the first pick to this block id (breaks the random first pick, R-03; never for results)
 
 # ------------------------------------------------------------------ sensing (notes only; the team decides)
 ENABLE_WRIST_FORCE_LOG = False  # [user] log the raw wrist force during motions
