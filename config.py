@@ -22,7 +22,7 @@ MAX_TURNS = 10  # [estimate] a trial ends after this many turns even without a c
 MAX_CONSECUTIVE_FAILURES = 2  # [estimate] a trial ends after this many failed turns in a row
 START_SETTLE_S = 1.0  # [estimate] the tower stands this long before the first turn, so a replay opens on the intact tower
 MOVER = "fake"  # [user] "fake" = teleport placeholder (results INVALID), "real" = the team's steps
-EXTRACTION_METHOD = "end_pinch"  # [user] "end_pinch" (default), "push" (push, pull, pedestal regrab, place; D-21) or "mixed" (push middles, end-pinch edges; D-07)
+EXTRACTION_METHOD = "mixed"  # [user] "mixed" (default: push middles, end-pinch edges; D-07, D-26), "end_pinch" (edges only) or "push" (middles only: push, pull, pedestal regrab, place; D-21)
 STRATEGY = "random"  # [course] "random", "rule_based", "perception", "force_guided"
 COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 
@@ -93,7 +93,7 @@ SAMPLE_DT_S = 0.02  # [estimate] how often to log wrist force during a motion
 TRACKING_WARN_M = 0.005  # [estimate] warn if the hand ends this far from its last waypoint
 PUSH_MIDDLE_ONLY = True  # [user] the push method takes middle blocks only: pushing an edge block moved a 6-layer tower 11.4 mm against 0.27 mm for end-pinch (D-07, measured, one trial each)
 PUSH_MIN_LAYERS_ABOVE = 2  # [measured] the push method takes a block only with at least this many COMPLETE layers above it (on a fresh 6-layer tower: layers 0-3). Layer 4, under the top layer, dragged the layer above at every pull speed tried (push sweep); 0 = no limit
-PUSH_MAX_LAYER = None  # [user] the push method takes a block only up to this layer; None = no cap. Under test (cap 3 vs none): in 6 mixed smoke games both pushes above layer 3 (layers 4 and 5, with placed layers on top) knocked the top layer off; push is tuned on layers 0-3
+PUSH_MAX_LAYER = 3  # [measured] the push method takes a block only up to this layer (None = no cap): push is tuned on layers 0-3, and in 6 mixed smoke games both pushes above layer 3 knocked the top layer off; cap 3 vs none 4.77 vs 4.79 blocks per game, p = 0.49 (D-26)
 PULL_INSIDE_SPEED_MS = 0.02  # [measured] push method's pull-out while the block is still in the tower (push.plan_pull). Of the speeds tested (0.02, 0.03, 0.05, 0.07, 0.1 m/s; middle blocks of layers 0-4, both ends), 0.02 is the only one where the layer above moved at most ~1 mm in every run (1.1 mm); 0.03 gave 3.4 mm on layer 4, 0.1 up to 251 mm. Faster pulls track worse, so the block tips more in the hand. Layer 4 near end collapses at every speed
 PULL_OUT_SPEED_MS = 0.1  # [estimate] the rest of the push method's 200 mm pull-out; 0.1 = as before
 CHECK_SWING_CLEARANCE = True  # [measured] joint-space moves take the first IK solution (in the usual order) whose path keeps the gripper and held block SWING_CLEARANCE_M clear (jenga/clearance.py); on for every method: needed by push (its pedestal swing went through the table), no significant change for end-pinch (200 paired games, DECISIONS O-1); False = the old choice exactly
@@ -111,7 +111,7 @@ PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pull
 # ------------------------------------------------------------------ rule-based strategy (jenga/strategies/rule_based.py)
 # Each factor is scored about 0 to 1; a weight says how much it counts.  0 turns a factor off.
 RB_P_END = 2 / 3  # [user] mixed method: chance of taking an edge block when both an edge and a middle are on offer (2 of a layer's 3 blocks are edges); with no good edge (only hollow ones) a middle is taken, with no middle an edge
-RB_MID_FULL_ABOVE = False  # [measured] count a middle as good only when the layer right above it is complete, as RB_COLUMN_FILTER does for edges (a risky middle is still taken before a hollow edge). Batch 1 (mixed, cap 3): pushes under a full layer ended the game 5 of 136, under a layer missing a block 69 of 136. Under test, off
+RB_MID_FULL_ABOVE = True  # [measured] count a middle as good only when the layer right above it is complete, as RB_COLUMN_FILTER does for edges (a risky middle is still taken before a hollow edge). Mixed, trials 0-99: pushes under a full layer ended the game 5 of 136, under a layer missing a block 69 of 136; 4.77 -> 6.19 blocks per game (D-26)
 # Layer weights for MIDDLE blocks (push); the RB_W_* settings below are the edge-block set.  A layer has one middle, so
 # the block weights do not apply to middles.  Same keys and meaning as RB_W_*.
 RB_MID_W = dict(  # [user] layer weights for middle blocks; each value has its own tag
@@ -122,7 +122,7 @@ RB_MID_W = dict(  # [user] layer weights for middle blocks; each value has its o
     SELF_FULL=0.75,  # [user] copied from the edge set
     CLEAR_OF_TOP=2.0,  # [estimate] copied from the edge set
     CLEAR_OF_BOTTOM=0.0,  # [user] middles allowed on layer 0: 1 of 12 layer-0 pushes ended the game, at the regrab (push-only games); a middle leaves the tower on both edges
-    FULL_ABOVE=0.0,  # [user] prefer middles whose layer right above is complete (off; the score version of RB_MID_FULL_ABOVE, under test)
+    FULL_ABOVE=0.0,  # [user] prefer middles whose layer right above is complete: the score version of RB_MID_FULL_ABOVE, off (2.0 instead of the filter: 5.11 vs 6.19 blocks per game, D-26)
 )
 RB_W_HEIGHT = 0.0  # [user] layer: prefer LOWER layers; off in V2 (cluster, 100 paired trials: V2 4.23 blocks per trial vs 3.15 random, 3.39 with height 1.0 and the old full weights; D-23)
 RB_W_FULL_LAYERS_NEAR = 0.5  # [user] layer: prefer layers whose neighbours above and below are still full (halved in V2, D-23)

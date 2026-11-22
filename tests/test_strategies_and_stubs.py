@@ -136,7 +136,7 @@ class TestRuleBased(unittest.TestCase):
         t = self._mid_tower()
         w = dict(HEIGHT=-2.0, FULL_LAYERS_NEAR=0.0, SELFSTILL=0.0, OTHERNEARSTILL=0.0, SELF_FULL=0.0, CLEAR_OF_TOP=0.0,
                  CLEAR_OF_BOTTOM=0.0, FULL_ABOVE=0.0)
-        cfg = lambda fa: make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=dict(w, FULL_ABOVE=fa))  # noqa: E731
+        cfg = lambda fa: make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=dict(w, FULL_ABOVE=fa), RB_MID_FULL_ABOVE=False)  # noqa: E731  (the score alone)
         self.assertEqual({select(t, [1, 4], cfg(0.0), np.random.default_rng(k)) for k in range(20)}, {4})
         self.assertEqual({select(t, [1, 4], cfg(2.0), np.random.default_rng(k)) for k in range(20)}, {1})
 
