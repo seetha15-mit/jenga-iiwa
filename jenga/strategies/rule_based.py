@@ -103,13 +103,15 @@ def layerscore(tower, layers,cfg, w=None):
         fulllayersnear = 0.5*(threeblocksleft(tower,layer_above)+threeblocksleft(tower,layer_below))
         selfstill = 1/(1+layerdisturbance(tower,candidatelayer,cfg))
         othernearstill = 1/(1+layerdisturbance(tower,layer_above,cfg)+layerdisturbance(tower,layer_below,cfg))
+        fullabove = 1.0*tower.is_complete(candidatelayer+1) #the layer right above is complete (middles: Batch 1 pushes under an incomplete layer ended the game 59%, under a full one 4%)
         scores[candidatelayer] = (w["HEIGHT"]    * height
                                 + w["FULL_LAYERS_NEAR"] * fulllayersnear
                                 + w["SELFSTILL"]     * selfstill
                                 + w["OTHERNEARSTILL"]      * othernearstill
                                 + w["SELF_FULL"]     * fulllayerself
                                 + w["CLEAR_OF_TOP"]  * cleartop
-                                + w["CLEAR_OF_BOTTOM"] * clearbottom)
+                                + w["CLEAR_OF_BOTTOM"] * clearbottom
+                                + w.get("FULL_ABOVE", 0.0) * fullabove)
     return scores
 
 def blockscore(tower, candidates, cfg):
@@ -138,19 +140,24 @@ def select_block(tower, candidates, cfg, rng, sensors=None) -> int:
         safecands = list(candidates)
     ends = [c for c in safecands if tower.blocks[c].slot != 1]
     middles = [c for c in safecands if tower.blocks[c].slot == 1]
-    goodends = ends
+    goodends, goodmiddles = ends, middles
     if cfg.RB_COLUMN_FILTER:  # edge blocks only: leave out hollow-column ones while an intact one is left (O-8)
         goodends = [c for c in ends if column_intact(tower, c)]
+    if cfg.RB_MID_FULL_ABOVE:  # middles only: a good middle has a complete layer right above it
+        goodmiddles = [c for c in middles if tower.is_complete(tower.blocks[c].layer + 1)]
     # Which kind: the extraction method sets what is offered (end-pinch: edges, push: middles, mixed: both).
-    # With both on offer, a coin picks edge with probability RB_P_END; with no good edge (none, or only hollow
-    # ones) a middle is taken instead, and with no middle an edge.  No coin is drawn otherwise, so end-only
-    # and middle-only games use the random stream exactly as before.
-    if goodends and middles:
+    # With a good block of both kinds on offer, a coin picks edge with probability RB_P_END; with a good block
+    # of only one kind, that kind.  With no good block at all, a risky middle (Batch 1: 59% ended the game) is
+    # taken before a hollow-column edge (ended it every time), else whatever edge is left.  No coin is drawn
+    # otherwise, so end-only and middle-only games use the random stream exactly as before.
+    if goodends and goodmiddles:
         kind = "end" if rng.random() < cfg.RB_P_END else "middle"
+    elif goodmiddles or (middles and not goodends):
+        kind = "middle"
     else:
-        kind = "middle" if middles else "end"
+        kind = "end"
     if kind == "middle":
-        safecands, w = middles, cfg.RB_MID_W
+        safecands, w = (goodmiddles or middles), cfg.RB_MID_W
     else:
         safecands, w = (goodends or ends), end_weights(cfg)
     layers = sorted({tower.blocks[candidate].layer for candidate in safecands})

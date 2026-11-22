@@ -114,6 +114,32 @@ class TestRuleBased(unittest.TestCase):
         high = make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=dict(low, HEIGHT=-2.0))
         self.assertEqual({select(t, [4, 7], high, np.random.default_rng(k)) for k in range(20)}, {7})
 
+    def _mid_tower(self):
+        t = TowerState(make_cfg(N_LAYERS_START=6))
+        t.remove_from_slot(6)  # layer 2 loses an edge: the layer-1 middle (4) is now under an incomplete layer,
+        return t               # the layer-0 middle (1) is still under a full one; edge 12 (layer 4) is now hollow
+
+    def test_full_above_filter_prefers_middles_under_a_full_layer(self):
+        select = strategies.get_strategy("rule_based")
+        t = self._mid_tower()
+        w = dict(HEIGHT=-2.0, FULL_LAYERS_NEAR=0.0, SELFSTILL=0.0, OTHERNEARSTILL=0.0, SELF_FULL=0.0, CLEAR_OF_TOP=0.0,
+                 CLEAR_OF_BOTTOM=0.0, FULL_ABOVE=0.0)  # prefers higher middles: the risky one (4)
+        cfg = lambda on: make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=w, RB_MID_FULL_ABOVE=on)  # noqa: E731
+        picks = lambda c, on: {select(t, c, cfg(on), np.random.default_rng(k)) for k in range(20)}  # noqa: E731
+        self.assertEqual(picks([1, 4], False), {4})
+        self.assertEqual(picks([1, 4], True), {1})
+        self.assertEqual(picks([4, 9], True), {9})  # no good middle, a good edge: the edge, though the coin says middle
+        self.assertEqual(picks([4, 12], True), {4})  # no good middle, only a hollow edge: the risky middle
+
+    def test_full_above_score_term(self):
+        select = strategies.get_strategy("rule_based")
+        t = self._mid_tower()
+        w = dict(HEIGHT=-2.0, FULL_LAYERS_NEAR=0.0, SELFSTILL=0.0, OTHERNEARSTILL=0.0, SELF_FULL=0.0, CLEAR_OF_TOP=0.0,
+                 CLEAR_OF_BOTTOM=0.0, FULL_ABOVE=0.0)
+        cfg = lambda fa: make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=dict(w, FULL_ABOVE=fa))  # noqa: E731
+        self.assertEqual({select(t, [1, 4], cfg(0.0), np.random.default_rng(k)) for k in range(20)}, {4})
+        self.assertEqual({select(t, [1, 4], cfg(2.0), np.random.default_rng(k)) for k in range(20)}, {1})
+
     def test_falls_back_when_no_pull_is_safe(self):
         select = strategies.get_strategy("rule_based")
         self.t.place(1, 3, 0)  # layer 0: only the edges 0 and 2 left, neither is safe to pull
