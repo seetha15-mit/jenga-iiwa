@@ -26,8 +26,23 @@ from jenga.methods import end_pinch
 
 # ====================================================================== rules (written)
 def can_pull(tower, block_id, cfg) -> bool:
-    """Push can take a block if some station faces its end face."""
+    """Push can take a block if some station faces its end face; with config.PUSH_MIDDLE_ONLY, only a middle
+    block (slot 1), since pushing an edge block disturbs the tower far more (D-07); and only with at least
+    config.PUSH_MIN_LAYERS_ABOVE complete layers above it (O-5)."""
+    if cfg.PUSH_MIDDLE_ONLY and tower.blocks[block_id].slot != 1:
+        return False
+    if layers_above(tower, block_id) < cfg.PUSH_MIN_LAYERS_ABOVE:
+        return False
     return len(base.push_stations(tower, block_id)) > 0
+
+
+def layers_above(tower, block_id) -> int:
+    """How many complete layers lie above this block's layer (0 for a loose block).  Their weight holds the layer
+    right above in place while the block slides out (config.PUSH_MIN_LAYERS_ABOVE)."""
+    layer = tower.blocks[block_id].layer
+    if layer is None:
+        return 0
+    return sum(tower.is_complete(k) for k in range(layer + 1, tower.top_layer() + 1))
 
 
 def choose_station(tower, block_id, cfg, current_station) -> int:

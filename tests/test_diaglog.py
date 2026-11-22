@@ -110,12 +110,12 @@ class TestHarnessDevOptions(unittest.TestCase):
         return harness.run_trial(cfg, 0, mover, out, make_world=MockWorld, log=lambda *_: None), out
 
     def test_forced_first_block_and_step_files(self):
-        self.cfg.DIAG_FIRST_BLOCK = 13
+        self.cfg.DIAG_FIRST_BLOCK = 10
         s, out = self.run_trial(self.cfg, LoggingMover())
-        self.assertEqual(s["first_block"], 13)
+        self.assertEqual(s["first_block"], 10)
         with open(out / "steps.csv") as f:
             rows = list(csv.DictReader(f))
-        self.assertEqual((rows[0]["block_id"], rows[0]["step"]), ("13", "teleport"))
+        self.assertEqual((rows[0]["block_id"], rows[0]["step"]), ("10", "teleport"))
         self.assertTrue((out / "step_blocks.csv").exists())
 
     def test_forced_block_must_be_legal(self):
