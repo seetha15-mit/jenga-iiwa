@@ -64,6 +64,22 @@ class TestRuleBased(unittest.TestCase):
         self.t.update_poses({0: self.t.target_pose(0, 0) @ tilt})  # a real 2 deg tilt still counts
         self.assertAlmostEqual(rule_based.blockdisturbance(self.t, 0, self.cfg), 1.0, places=2)
 
+    def test_column_filter_skips_hollow_columns_while_an_intact_one_is_left(self):
+        from jenga.strategies import rule_based
+        select = strategies.get_strategy("rule_based")
+        cfg = make_cfg(N_LAYERS_START=6)
+        t = TowerState(cfg)
+        t.remove_from_slot(3)  # layer 1 slot 0 is gone: layer 3 slot 0 (block 9) now has a hollow column
+        self.assertFalse(rule_based.column_intact(t, 9))
+        self.assertTrue(rule_based.column_intact(t, 11))
+        cands = [9, 11]  # the two edges of layer 3
+        off = {select(t, cands, make_cfg(N_LAYERS_START=6, RB_COLUMN_FILTER=False), np.random.default_rng(k)) for k in range(40)}
+        on = {select(t, cands, make_cfg(N_LAYERS_START=6, RB_COLUMN_FILTER=True), np.random.default_rng(k)) for k in range(40)}
+        self.assertIn(9, off)  # V2's weighted pick takes the hollow one some of the time
+        self.assertEqual(on, {11})
+        # only hollow blocks left: falls back to them, as V2 would
+        self.assertEqual(select(t, [9], make_cfg(N_LAYERS_START=6, RB_COLUMN_FILTER=True), np.random.default_rng(0)), 9)
+
     def test_falls_back_when_no_pull_is_safe(self):
         select = strategies.get_strategy("rule_based")
         self.t.place(1, 3, 0)  # layer 0: only the edges 0 and 2 left, neither is safe to pull

@@ -63,6 +63,13 @@ def blocksbelow(tower,candidatelayer,slot):
     else:
         return count/checked
     
+def column_intact(tower, block) -> bool:
+    """True if no block is missing from this block's column: the same slot in every same-direction layer below it
+    (blocksbelow == 1).  Pulling a block whose column is hollow ended the game every time in V2's end-pinch
+    games (93 of 93, DECISIONS O-8)."""
+    info = tower.blocks[block]
+    return blocksbelow(tower, info.layer, info.slot) >= 1.0
+
 def towerimbalance(tower,block,cfg):
     info = tower.blocks[block]
     if info.slot == 1:
@@ -121,6 +128,10 @@ def select_block(tower, candidates, cfg, rng, sensors=None) -> int:
     safecands = [candidate for candidate in candidates if layer_stable(tower,candidate)]
     if not safecands:
         safecands = list(candidates)
+    if cfg.RB_COLUMN_FILTER:  # leave out hollow-column blocks while any block with an intact column is left (O-8)
+        intact = [candidate for candidate in safecands if column_intact(tower, candidate)]
+        if intact:
+            safecands = intact
     layers = sorted({tower.blocks[candidate].layer for candidate in safecands})
     #layers_3bl = [layer for layer in layers if threeblocksleft(tower,layer)]
     #pool = layers_3bl if layers_3bl else layers
