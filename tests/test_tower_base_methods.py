@@ -195,6 +195,13 @@ class TestPushRules(unittest.TestCase):
         self.assertEqual(push.layers_above(t, 7), 2)
         self.assertEqual(push.layers_above(t, 4), 3)
 
+    def test_layer_cap(self):
+        cfg = make_cfg(N_LAYERS_START=6, PUSH_MIDDLE_ONLY=True, PUSH_MIN_LAYERS_ABOVE=0, PUSH_MAX_LAYER=None)
+        t = TowerState(cfg)
+        self.assertEqual([b for b in t.pull_candidates() if push.can_pull(t, b, cfg)], [1, 4, 7, 10, 13])
+        capped = make_cfg(N_LAYERS_START=6, PUSH_MIDDLE_ONLY=True, PUSH_MIN_LAYERS_ABOVE=0, PUSH_MAX_LAYER=2)
+        self.assertEqual([b for b in t.pull_candidates() if push.can_pull(t, b, capped)], [1, 4, 7])
+
     def test_push_stations_face_the_block_ends(self):
         # layer 0: long axis along world y, so the robot faces +y or -y; layer 1: long axis along x
         for bid in (0, 1, 2, 6, 7, 8):

@@ -28,8 +28,12 @@ from jenga.methods import end_pinch
 def can_pull(tower, block_id, cfg) -> bool:
     """Push can take a block if some station faces its end face; with config.PUSH_MIDDLE_ONLY, only a middle
     block (slot 1), since pushing an edge block disturbs the tower far more (D-07); and only with at least
-    config.PUSH_MIN_LAYERS_ABOVE complete layers above it (O-5)."""
+    config.PUSH_MIN_LAYERS_ABOVE complete layers above it (O-5); and with config.PUSH_MAX_LAYER set, only up to
+    that layer (push is tuned on layers 0-3)."""
     if cfg.PUSH_MIDDLE_ONLY and tower.blocks[block_id].slot != 1:
+        return False
+    layer = tower.blocks[block_id].layer
+    if cfg.PUSH_MAX_LAYER is not None and layer is not None and layer > cfg.PUSH_MAX_LAYER:
         return False
     if layers_above(tower, block_id) < cfg.PUSH_MIN_LAYERS_ABOVE:
         return False
