@@ -121,7 +121,7 @@ RB_LAYER_TIE = 0.1  # [estimate] layers scoring within this of the best are tied
 RB_W_EDGE = 1.0  # [estimate] block: prefer edge blocks (only matters for push; end-pinch takes edges only)
 RB_W_BALANCED = 1.0  # [estimate] block: prefer pulls that keep the support below the layer balanced
 RB_W_SELFSTILL_BLOCK = 1.0  # [estimate] block: prefer blocks that have not moved from their slot
-RB_COLUMN_FILTER = False  # [user] before scoring, drop blocks with a hollow column (a same-slot block missing in a same-direction layer below) while any block with an intact column is a candidate; off = V2 as before. Hollow-column pulls ended 93 of V2's 100 end-pinch games (DECISIONS O-8)
+RB_COLUMN_FILTER = True  # [measured] before scoring, drop blocks with a hollow column (a same-slot block missing in a same-direction layer below) while any block with an intact column is a candidate; False = V2 as in D-23. V2 end-pinch 3.99 -> 6.27 blocks per game on fresh trials 200-299 (DECISIONS O-8)
 RB_W_BLOCKS_BELOW = 1.0  # [estimate] block: prefer blocks with their column below still filled
 RB_DISTURB_M = 0.002  # [estimate] a block moved this far counts as 1 unit of disturbance (same as STATIC_MAX_MOVE_M)
 RB_DISTURB_DEG = 2.0  # [estimate] a block turned this much counts as 1 unit of disturbance
