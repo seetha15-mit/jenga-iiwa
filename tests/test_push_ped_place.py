@@ -50,5 +50,24 @@ class TestPedPlace(unittest.TestCase):
         self.assertAlmostEqual(set_z - dz, self.cfg.PEDESTAL_HEIGHT_M - 0.002, places=6)
 
 
+@unittest.skipUnless(HAVE_DRAKE, "needs pydrake")
+class TestPedTarget(unittest.TestCase):
+    def test_default_target_is_the_post_2_mm_down(self):
+        cfg = make_cfg()
+        X = push.pedestal_target(cfg)
+        d = cfg.PEDESTAL_DISTANCE_M / np.sqrt(2)
+        np.testing.assert_allclose(X.translation(), [cfg.STATION_STANDOFF_M - d, d, cfg.PEDESTAL_HEIGHT_M - 0.002])
+
+    def test_the_plan_moves_rigidly_with_its_target(self):
+        cfg = make_cfg()
+        base_plan = push.plan_ped_place(RigidTransform(), cfg)
+        shift = np.array([0.003, -0.002, 0.012])  # e.g. the block slid 12 mm down the fingers
+        X_T = push.pedestal_target(cfg)
+        moved = push.plan_ped_place(RigidTransform(), cfg, target=RigidTransform(X_T.rotation(), X_T.translation() + shift))
+        for a, b in zip(base_plan, moved):
+            np.testing.assert_allclose(b.X_RG.translation() - a.X_RG.translation(), shift, atol=1e-12)
+            self.assertEqual(a.opening, b.opening)
+
+
 if __name__ == "__main__":
     unittest.main()

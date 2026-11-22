@@ -104,6 +104,7 @@ JOINT_LIMIT_WARN_RAD = 0.05  # [estimate] warn if an arm joint ends this close t
 COLLAPSE_DISPLACEMENT_M = 0.02  # [estimate] any other block moving more than this ends the trial
 PLACE_TOLERANCE_M = 0.02  # [estimate] a block this close to its target slot counts as replaced
 PLACE_CORRECT_GRASP = True  # [user] before a place, read where the block sits in the hand (simulator truth; a real robot needs a camera) and shift the aim by the offset: it slid 3-6 mm during the base roll (measured, Mac, 3 turns; D-08)
+PEDESTAL_CORRECT_GRASP = True  # [user] push method: before setting the block on the pedestal, read where it sits in the hand (simulator truth, as PLACE_CORRECT_GRASP) and shift the set-down by the offset: it slides 6-15 mm down the fingers during the swing, so a fixed set-down drove it into the post and it tipped off (push sweep and games)
 PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pulled out
 
 # ------------------------------------------------------------------ rule-based strategy (jenga/strategies/rule_based.py)

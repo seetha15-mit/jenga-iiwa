@@ -103,7 +103,7 @@ class RealMover:
         def do(name, fn, *args, **kw):  # run one step; with the development log on, record what it did
             if dlog:
                 dlog.begin_step()
-                if dlog.per_waypoint and fn is ex.run_plan:
+                if dlog.per_waypoint and fn in (ex.run_plan, ex.run_waypoints):
                     kw["on_waypoint"] = lambda i, wp: dlog.waypoint(name, i, wp)
             try:
                 res = fn(*args, **kw)
@@ -127,8 +127,17 @@ class RealMover:
                cfg.WAYPOINT_SPEED_MS, label="pull")
             # ---- set it on a pedestal, then regrab it from where it actually landed (D-22); each is its own plan,
             # so each starts with a joint move (this clears the hand's drift before the regrab grasp)
-            do("pedestal", ex.run_plan, world, method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg),
-               cfg.WAYPOINT_SPEED_MS, label="pedestal", held=block_id)
+            # swing to above the post; then read where the block really sits in the hand (it slides 6-15 mm down
+            # the fingers during the swing) and shift the set-down by that, as for the place (D-08); then go down
+            ped = method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg)
+            do("pedestal", ex.run_plan, world, ped[:1], cfg.WAYPOINT_SPEED_MS, label="pedestal", held=block_id)
+            if cfg.PEDESTAL_CORRECT_GRASP:
+                X_T = RigidTransform(grasp_corrected_target(
+                    method.pedestal_target(cfg), ped[1].X_RG, world.kin.gripper_pose(world.arm_q()),
+                    base.to_robot_frame(world.X_WR(), world.block_poses()[block_id])))
+                ped = method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg, target=X_T)
+            do("pedestal_set", ex.run_waypoints, world, ped, cfg.WAYPOINT_SPEED_MS, label="pedestal set-down",
+               first_index=0)
             do("regrab", ex.run_plan, world, method.plan_regrab(in_R(world.block_poses()[block_id]), cfg),
                cfg.WAYPOINT_SPEED_MS, label="regrab")
         else:

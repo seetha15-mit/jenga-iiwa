@@ -125,17 +125,32 @@ def plan_pull(X_RB, cfg):
     wayplist.append(Waypoint(pickpounce@upoffset, W-1.75*cfg.FINGER_SQUEEZE_M))
     return wayplist
 
-def plan_ped_place(X_RB, cfg):
+def pedestal_target(cfg):
+    """Where the block should end up on the pedestal on the robot's left (D-22), in the robot frame at the pull
+    station: block frame B (bottom-face centre) over the post, long axis pointing at the tower, bottom 2 mm below
+    the post top (pressed in slightly so it sits).
+
+    Inputs: cfg (config).  Returns: RigidTransform X_RB.
+    """
+    from pydrake.all import RigidTransform, RotationMatrix
+    d = cfg.PEDESTAL_DISTANCE_M / np.sqrt(2)
+    return RigidTransform(RotationMatrix.MakeZRotation(-np.pi/4), [cfg.STATION_STANDOFF_M - d, d, cfg.PEDESTAL_HEIGHT_M - 0.002])
+
+
+def plan_ped_place(X_RB, cfg, target=None):
     """Waypoints that carry the pulled block to the pedestal on the robot's left (D-22), set it down with its
     long axis pointing at the tower, let go and rise.  The first waypoint is a joint move, which also puts the
     arm in a configuration that can reach the pedestal; plan_regrab then picks the block up level by its ends.
-    X_RB: the block's pose in the hand after plan_pull (unused: the pedestal pose comes from config)."""
+
+    Inputs: X_RB (the block's pose after plan_pull; unused), cfg (config), target (where the block should end up,
+    X_RB on the post; None = pedestal_target(cfg)).  The plan moves rigidly with the target, so the mover can
+    shift it by where the block really sits in the hand (mover.grasp_corrected_target, as for the place).
+    Returns: list of Waypoint: [0] 100 mm above the set point, [1] the set point (still gripping), then release
+    and rise.
+    """
     from pydrake.all import RigidTransform, RotationMatrix
     L,W,H = geo.block_dims(cfg)
-    d = cfg.PEDESTAL_DISTANCE_M / np.sqrt(2)
-    R_RBped = RotationMatrix.MakeZRotation(-np.pi/4)
-    # Release 2 mm BELOW the post top with a +1 mm target
-    X_RBped = RigidTransform(R_RBped,[cfg.STATION_STANDOFF_M - d, d, cfg.PEDESTAL_HEIGHT_M - 0.002])
+    X_RBped = pedestal_target(cfg) if target is None else target
     R_BG = RotationMatrix.MakeXRotation(np.radians(-180))@RotationMatrix.MakeZRotation(np.radians(-90))
     X_BG = RigidTransform(R_BG,[-L/2-cfg.FINGERTIP_REACH_M+L/5,0,0.5*H])
     setpoint = X_RBped @ X_BG

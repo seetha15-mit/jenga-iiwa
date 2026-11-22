@@ -31,6 +31,9 @@ class FakeExecutor:
     def run_plan(self, world, waypoints, speed, label="", held=None):
         self.log.append((label, world.station))
 
+    def run_waypoints(self, world, waypoints, speed, label="", first_index=1):
+        self.log.append((label, world.station))
+
 
 class FakeWorld:
     def __init__(self, cfg, tower):
@@ -84,6 +87,7 @@ class TestGraspCorrection(unittest.TestCase):
 class TestRealMoverSteps(unittest.TestCase):
     def run_turn(self, cfg, method, block_id, place_station):
         cfg.PLACE_CORRECT_GRASP = False  # the recorded plans are not waypoints and FakeWorld has no arm
+        cfg.PEDESTAL_CORRECT_GRASP = False
         tower = TowerState(cfg)
         world, ex = FakeWorld(cfg, tower), FakeExecutor()
         plans = {name: mock.patch.object(method, name, return_value=["wp"])
@@ -105,8 +109,8 @@ class TestRealMoverSteps(unittest.TestCase):
         # pedestal and regrab it there (two plans, so each starts with a joint move), place from 1; no tuck after
         # the regrab, so the end-pinched block is not swung through the ~150 deg wrist turn (O-5)
         log, info = self.run_turn(make_cfg(EXTRACTION_METHOD="push"), push, 1, place_station=1)
-        self.assertEqual(log, [("base", 1), ("push", 1), ("base", 3), ("pull", 3), ("pedestal", 3), ("regrab", 3),
-                               ("base, no tuck", 1), ("place", 1)])
+        self.assertEqual(log, [("base", 1), ("push", 1), ("base", 3), ("pull", 3), ("pedestal", 3),
+                               ("pedestal set-down", 3), ("regrab", 3), ("base, no tuck", 1), ("place", 1)])
         self.assertEqual((info.station_pull, info.station_place), (3, 1))
 
     def test_end_pinch_still_runs_pull_then_place(self):
@@ -118,7 +122,7 @@ class TestRealMoverSteps(unittest.TestCase):
         cfg = make_cfg(EXTRACTION_METHOD="mixed")
         log, _ = self.run_turn(cfg, push, 1, place_station=1)  # block 1: middle of layer 0
         self.assertEqual([step for step, _ in log if not step.startswith("base")],
-                         ["push", "pull", "pedestal", "regrab", "place"])
+                         ["push", "pull", "pedestal", "pedestal set-down", "regrab", "place"])
         log, _ = self.run_turn(cfg, end_pinch, 0, place_station=1)  # block 0: edge of layer 0
         self.assertEqual([step for step, _ in log if not step.startswith("base")], ["pull", "place"])
 
