@@ -109,6 +109,18 @@ PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pull
 
 # ------------------------------------------------------------------ rule-based strategy (jenga/strategies/rule_based.py)
 # Each factor is scored about 0 to 1; a weight says how much it counts.  0 turns a factor off.
+RB_P_END = 2 / 3  # [user] mixed method: chance of taking an edge block when both an edge and a middle are on offer (2 of a layer's 3 blocks are edges); with no good edge (only hollow ones) a middle is taken, with no middle an edge
+# Layer weights for MIDDLE blocks (push); the RB_W_* settings below are the edge-block set.  A layer has one middle, so
+# the block weights do not apply to middles.  Same keys and meaning as RB_W_*.
+RB_MID_W = dict(  # [user] layer weights for middle blocks; each value has its own tag
+    HEIGHT=2.0,  # [user] prefer lower layers: push is tuned on layers 0-3; its only tower collapses were on layer 4 (2 of 12 pushes, 12 push-only random games)
+    FULL_LAYERS_NEAR=0.5,  # [user] copied from the edge set
+    SELFSTILL=1.0,  # [estimate] copied from the edge set
+    OTHERNEARSTILL=1.0,  # [estimate] copied from the edge set
+    SELF_FULL=0.75,  # [user] copied from the edge set
+    CLEAR_OF_TOP=2.0,  # [estimate] copied from the edge set
+    CLEAR_OF_BOTTOM=0.0,  # [user] middles allowed on layer 0: 1 of 12 layer-0 pushes ended the game, at the regrab (push-only games); a middle leaves the tower on both edges
+)
 RB_W_HEIGHT = 0.0  # [user] layer: prefer LOWER layers; off in V2 (cluster, 100 paired trials: V2 4.23 blocks per trial vs 3.15 random, 3.39 with height 1.0 and the old full weights; D-23)
 RB_W_FULL_LAYERS_NEAR = 0.5  # [user] layer: prefer layers whose neighbours above and below are still full (halved in V2, D-23)
 RB_W_SELFSTILL = 1.0  # [estimate] layer: prefer layers whose blocks have not moved from their slots

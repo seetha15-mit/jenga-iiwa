@@ -78,8 +78,16 @@ def towerimbalance(tower,block,cfg):
     other = blocksbelow(tower,info.layer,2-info.slot)
     return 0.5+0.5*(own-other)
 
-def layerscore(tower, layers,cfg):
+def end_weights(cfg) -> dict:
+    """The layer weights for edge blocks: the RB_W_* settings (V2, D-23)."""
+    return dict(HEIGHT=cfg.RB_W_HEIGHT, FULL_LAYERS_NEAR=cfg.RB_W_FULL_LAYERS_NEAR, SELFSTILL=cfg.RB_W_SELFSTILL,
+                OTHERNEARSTILL=cfg.RB_W_OTHERNEARSTILL, SELF_FULL=cfg.RB_W_SELF_FULL,
+                CLEAR_OF_TOP=cfg.RB_W_CLEAR_OF_TOP, CLEAR_OF_BOTTOM=cfg.RB_W_CLEAR_OF_BOTTOM)
+
+def layerscore(tower, layers,cfg, w=None):
     # each factor weighted 0 to 1 and then weighted using config weights
+    # w: the layer weights (end_weights(cfg) for edge blocks, cfg.RB_MID_W for middles)
+    w = end_weights(cfg) if w is None else w
     scores = {}
     toplayer = max(tower.top_layer(), 1)
     for candidatelayer in layers:
@@ -95,13 +103,13 @@ def layerscore(tower, layers,cfg):
         fulllayersnear = 0.5*(threeblocksleft(tower,layer_above)+threeblocksleft(tower,layer_below))
         selfstill = 1/(1+layerdisturbance(tower,candidatelayer,cfg))
         othernearstill = 1/(1+layerdisturbance(tower,layer_above,cfg)+layerdisturbance(tower,layer_below,cfg))
-        scores[candidatelayer] = (cfg.RB_W_HEIGHT    * height
-                                + cfg.RB_W_FULL_LAYERS_NEAR * fulllayersnear
-                                + cfg.RB_W_SELFSTILL     * selfstill
-                                + cfg.RB_W_OTHERNEARSTILL      * othernearstill
-                                + cfg.RB_W_SELF_FULL     * fulllayerself
-                                + cfg.RB_W_CLEAR_OF_TOP  * cleartop
-                                + cfg.RB_W_CLEAR_OF_BOTTOM * clearbottom)
+        scores[candidatelayer] = (w["HEIGHT"]    * height
+                                + w["FULL_LAYERS_NEAR"] * fulllayersnear
+                                + w["SELFSTILL"]     * selfstill
+                                + w["OTHERNEARSTILL"]      * othernearstill
+                                + w["SELF_FULL"]     * fulllayerself
+                                + w["CLEAR_OF_TOP"]  * cleartop
+                                + w["CLEAR_OF_BOTTOM"] * clearbottom)
     return scores
 
 def blockscore(tower, candidates, cfg):
@@ -128,14 +136,27 @@ def select_block(tower, candidates, cfg, rng, sensors=None) -> int:
     safecands = [candidate for candidate in candidates if layer_stable(tower,candidate)]
     if not safecands:
         safecands = list(candidates)
-    if cfg.RB_COLUMN_FILTER:  # leave out hollow-column blocks while any block with an intact column is left (O-8)
-        intact = [candidate for candidate in safecands if column_intact(tower, candidate)]
-        if intact:
-            safecands = intact
+    ends = [c for c in safecands if tower.blocks[c].slot != 1]
+    middles = [c for c in safecands if tower.blocks[c].slot == 1]
+    goodends = ends
+    if cfg.RB_COLUMN_FILTER:  # edge blocks only: leave out hollow-column ones while an intact one is left (O-8)
+        goodends = [c for c in ends if column_intact(tower, c)]
+    # Which kind: the extraction method sets what is offered (end-pinch: edges, push: middles, mixed: both).
+    # With both on offer, a coin picks edge with probability RB_P_END; with no good edge (none, or only hollow
+    # ones) a middle is taken instead, and with no middle an edge.  No coin is drawn otherwise, so end-only
+    # and middle-only games use the random stream exactly as before.
+    if goodends and middles:
+        kind = "end" if rng.random() < cfg.RB_P_END else "middle"
+    else:
+        kind = "middle" if middles else "end"
+    if kind == "middle":
+        safecands, w = middles, cfg.RB_MID_W
+    else:
+        safecands, w = (goodends or ends), end_weights(cfg)
     layers = sorted({tower.blocks[candidate].layer for candidate in safecands})
     #layers_3bl = [layer for layer in layers if threeblocksleft(tower,layer)]
     #pool = layers_3bl if layers_3bl else layers
-    layscore = layerscore(tower,layers,cfg)
+    layscore = layerscore(tower,layers,cfg,w)
 
     best = max(layscore.values())
     toplayers = [l for l, s in layscore.items() if s >= best - cfg.RB_LAYER_TIE]

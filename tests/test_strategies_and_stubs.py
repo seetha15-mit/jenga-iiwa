@@ -80,6 +80,40 @@ class TestRuleBased(unittest.TestCase):
         # only hollow blocks left: falls back to them, as V2 would
         self.assertEqual(select(t, [9], make_cfg(N_LAYERS_START=6, RB_COLUMN_FILTER=True), np.random.default_rng(0)), 9)
 
+    def test_mixed_coin_chooses_edge_or_middle(self):
+        select = strategies.get_strategy("rule_based")
+        t = TowerState(make_cfg(N_LAYERS_START=6))
+        cands = [b for b in range(12)]  # layers 0-3: edges and middles (block id = 3 * layer + slot)
+        kinds = lambda p: [t.blocks[select(t, cands, make_cfg(N_LAYERS_START=6, RB_P_END=p), np.random.default_rng(k))].slot == 1
+                           for k in range(300)]  # noqa: E731
+        self.assertFalse(any(kinds(1.0)))  # always an edge
+        self.assertTrue(all(kinds(0.0)))  # always a middle
+        self.assertTrue(0.2 < np.mean(kinds(2 / 3)) < 0.45)  # about 1/3 middles
+
+    def test_mixed_falls_back_to_the_other_kind(self):
+        select = strategies.get_strategy("rule_based")
+        cfg = make_cfg(N_LAYERS_START=6)
+        t = TowerState(cfg)
+        t.remove_from_slot(0)
+        t.remove_from_slot(2)  # layer 0 has only its middle: every edge in layers 2 and 4 now has a hollow column
+        for k in range(20):  # only hollow edges (layer 2) and a middle (layer 1): the middle, even with the coin on edges
+            self.assertEqual(select(t, [6, 8, 4], make_cfg(N_LAYERS_START=6, RB_P_END=1.0), np.random.default_rng(k)), 4)
+            self.assertIn(select(t, [6, 8], make_cfg(N_LAYERS_START=6, RB_P_END=0.0), np.random.default_rng(k)), (6, 8))  # no middle: an edge
+
+    def test_middles_use_their_own_weights_and_skip_the_column_filter(self):
+        select = strategies.get_strategy("rule_based")
+        t = TowerState(make_cfg(N_LAYERS_START=6))
+        middles = [1, 4, 7, 10]
+        low = dict(HEIGHT=2.0, FULL_LAYERS_NEAR=0.0, SELFSTILL=0.0, OTHERNEARSTILL=0.0, SELF_FULL=0.0, CLEAR_OF_TOP=0.0,
+                   CLEAR_OF_BOTTOM=0.0)
+        cfg = make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=low)
+        self.assertEqual({select(t, middles, cfg, np.random.default_rng(k)) for k in range(20)}, {1})  # lowest middle
+        no_bottom = make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=dict(low, CLEAR_OF_BOTTOM=5.0))
+        self.assertNotIn(1, {select(t, middles, no_bottom, np.random.default_rng(k)) for k in range(20)})
+        t.remove_from_slot(1)  # layer 0 middle gone: the layer-2 middle (7) has a hollow column but is still taken
+        high = make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=dict(low, HEIGHT=-2.0))
+        self.assertEqual({select(t, [4, 7], high, np.random.default_rng(k)) for k in range(20)}, {7})
+
     def test_falls_back_when_no_pull_is_safe(self):
         select = strategies.get_strategy("rule_based")
         self.t.place(1, 3, 0)  # layer 0: only the edges 0 and 2 left, neither is safe to pull
