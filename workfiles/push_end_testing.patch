@@ -1,0 +1,97 @@
+Push direction switch (push method): a testing patch, kept for debugging.  Not adopted: the default "near" is what
+the committed code already does, so this only adds the option to push from the other end.
+
+What it does: adds PUSH_END ("near" = the default, the nearer of the two stations facing the block's ends; "far" =
+the other one) to config.py and config_check.py, uses it in push.choose_station, plus a unit test.
+
+Why: the push sweep tested both push directions for every middle block, to tell a
+direction problem from a block problem.  Useful again whenever the push method is changed or a push fails only from
+one side.
+
+To use it:   git apply workfiles/push_end_testing.patch
+             then run with --set PUSH_END='far' (or 'near')
+Take it out again before committing (git apply -R workfiles/push_end_testing.patch).
+Made against the commit that added this file; check with `git apply --check` first.
+
+diff --git a/config.py b/config.py
+index 747b1cb..035dfb2 100644
+--- a/config.py
++++ b/config.py
+@@ -136,6 +136,7 @@ PRINT_SIM_SPEED = True  # [user] print simulated seconds per wall second
+ DIAG_LOG_LEVEL = 0  # [user] 0 off; 1 one row per step of a turn (steps.csv); 2 also one row per block per step (step_blocks.csv)
+ DIAG_LOG_FEATURES = ("block", "neighbours", "hand", "joints")  # [user] column groups in steps.csv; "waypoints" adds a row per waypoint (jenga/diaglog.py)
+ DIAG_FIRST_BLOCK = None  # [user] development only: force the first pick to this block id (breaks the random first pick, R-03; never for results)
++PUSH_END = "near"  # [user] push method: push from the "near" end (shorter base move, default) or the "far" end of the block
+ 
+ # ------------------------------------------------------------------ sensing (notes only; the team decides)
+ ENABLE_WRIST_FORCE_LOG = False  # [user] log the raw wrist force during motions
+diff --git a/jenga/config_check.py b/jenga/config_check.py
+index 2d6060c..ff6062d 100644
+--- a/jenga/config_check.py
++++ b/jenga/config_check.py
+@@ -35,7 +35,7 @@ def check_values(cfg) -> list:
+         "COLLAPSE_DETECTOR": ("basic", "advanced"), "BASE_MODE": ("mobile", "fixed"),
+         "CONTACT_MODEL": ("hydroelastic", "point"), "FRICTION_MODE": ("global", "random"),
+         "CONTACT_APPROXIMATION": ("sap", "lagged", "similar", "default"),
+-        "FIRST_LAYER_LONG_AXIS": ("x", "y"), "DIAG_LOG_LEVEL": (0, 1, 2),
++        "FIRST_LAYER_LONG_AXIS": ("x", "y"), "PUSH_END": ("near", "far"), "DIAG_LOG_LEVEL": (0, 1, 2),
+     }
+     for name, allowed in choices.items():
+         if getattr(cfg, name) not in allowed:
+diff --git a/jenga/methods/push.py b/jenga/methods/push.py
+index e74d3b9..36d7bd2 100644
+--- a/jenga/methods/push.py
++++ b/jenga/methods/push.py
+@@ -46,8 +46,13 @@ def layers_above(tower, block_id) -> int:
+ 
+ 
+ def choose_station(tower, block_id, cfg, current_station) -> int:
+-    """The station to push from: of the two that face the block's ends, the nearer one."""
+-    return base.nearest_station(cfg, base.push_stations(tower, block_id), current_station)
++    """The station to push from: of the two that face the block's ends, the nearer one, or the other one with
++    config.PUSH_END = "far" (to test both directions)."""
++    ends = base.push_stations(tower, block_id)
++    near = base.nearest_station(cfg, ends, current_station)
++    if cfg.PUSH_END == "far":
++        return next(k for k in ends if k != near)
++    return near
+ 
+ 
+ def choose_pull_station(tower, block_id, cfg, push_station) -> int:
+diff --git a/tests/test_diaglog.py b/tests/test_diaglog.py
+index dda9af8..738aa98 100644
+--- a/tests/test_diaglog.py
++++ b/tests/test_diaglog.py
+@@ -1,4 +1,4 @@
+-"""Development log (jenga/diaglog.py) and the forced first block.  Pure Python."""
++"""Development log (jenga/diaglog.py), the forced first block and the push direction switch.  Pure Python."""
+ 
+ import csv
+ import tempfile
+@@ -8,8 +8,9 @@ from types import SimpleNamespace
+ 
+ import numpy as np
+ 
+-from jenga import config_check, diaglog
++from jenga import base, config_check, diaglog
+ from jenga.evaluation import harness
++from jenga.methods import push
+ from jenga.mover import TurnInfo
+ from jenga.tower import TowerState
+ from tests.helpers import MockWorld, RealLikeMover, make_cfg
+@@ -124,5 +125,15 @@ class TestHarnessDevOptions(unittest.TestCase):
+             self.run_trial(self.cfg, LoggingMover())
+ 
+ 
++class TestPushEnd(unittest.TestCase):
++    def test_far_is_the_other_end(self):
++        t = TowerState(make_cfg())
++        for k in range(4):
++            near = push.choose_station(t, 1, make_cfg(), current_station=k)
++            far = push.choose_station(t, 1, make_cfg(PUSH_END="far"), current_station=k)
++            self.assertEqual({near, far}, set(base.push_stations(t, 1)))
++            self.assertEqual(push.choose_pull_station(t, 1, make_cfg(), far), near)
++
++
+ if __name__ == "__main__":
+     unittest.main()
