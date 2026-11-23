@@ -1,0 +1,155 @@
+Held-swing speed limit (push method), NOT adopted yet: a patch to pick up later instead of starting over.
+
+What it does: while a block is held, a joint-space swing is slowed so the block's centre never moves faster than
+HELD_SWING_MAX_SPEED_MS (m/s; 0 = off, the default it adds).  The path is unchanged, only the duration is
+stretched (clearance.held_swing_time; executor.move_arm_to_q gets a `held` argument).  Includes its unit tests.
+
+Why: in push-only games a block swung to the pedestal at 1.67 m/s fell out of the hand; blocks tip more in the
+fingers the faster they swing.  At 0.5 m/s it fixed that drop, but overall 29 vs 32 blocks placed in 8 games,
+because the pedestal set-down was a coin toss at the time (fixed since: DECISIONS.md D-22).  See O-5.
+
+To try it:   git apply workfiles/held_swing_testing.patch
+             then run the push sweep and games with --set HELD_SWING_MAX_SPEED_MS=0.5 (cluster scripts)
+Made against the commit that added this file; check with `git apply --check` first.
+
+--- a/config.py
++++ b/config.py
+@@ -87,6 +87,7 @@
+ 
+ # ------------------------------------------------------------------ motions
+ WAYPOINT_SPEED_MS = 0.1  # [estimate] hand speed between waypoints
++HELD_SWING_MAX_SPEED_MS = 0.0  # [estimate] while a block is held, joint-space swings are slowed so its centre stays at or below this (m/s); 0 = off (as before). Push games: a held block swung at 1.67 m/s fell out of the hand; at <= 1.09 m/s it stayed (it tips more the faster it goes)
+ JOINT_SPEED_RAD_S = 0.5  # [estimate] speed of joint-space moves
+ HOLD_AFTER_MOTION_S = 0.3  # [estimate] stand still this long after each motion
+ SAMPLE_DT_S = 0.02  # [estimate] how often to log wrist force during a motion
+--- a/jenga/executor.py
++++ b/jenga/executor.py
+@@ -89,12 +89,25 @@
+     return res
+ 
+ 
+-def move_arm_to_q(world, q_target, opening=None, label: str = "joint move") -> PhaseResult:
+-    """Joint-space move to the arm angles q_target (a straight line in joint angles, bell-shaped speed)."""
++def move_arm_to_q(world, q_target, opening=None, label: str = "joint move", held=None) -> PhaseResult:
++    """Joint-space move to the arm angles q_target (a straight line in joint angles, bell-shaped speed).
++
++    Inputs: world (the Sim), q_target (arm angles, rad), opening (finger opening during the move, m; None keeps the
++    current one), label (text for messages), held (id of the block in the hand, or None).
++    Duration: the largest joint turn at JOINT_SPEED_RAD_S (at least 0.5 s); with a held block and
++    HELD_SWING_MAX_SPEED_MS > 0, stretched so the block's centre never moves faster than that (a block swung at
++    1.7 m/s left the hand, push games).
++    Returns: the PhaseResult of the move.
++    """
+     cfg = world.cfg
+     q0 = world.arm_q()
+     q1 = np.asarray(q_target, float)
+     T = max(float(np.max(np.abs(q1 - q0))) / cfg.JOINT_SPEED_RAD_S, 0.5)
++    if held is not None and cfg.HELD_SWING_MAX_SPEED_MS > 0:
++        fk = lambda q: np.asarray(world.kin.gripper_pose(q).GetAsMatrix4())  # noqa: E731
++        X_RB = base_mod.to_robot_frame(world.X_WR(), world.block_poses()[held])
++        p_G = (np.linalg.inv(fk(q0)) @ X_RB)[:3, 3]
++        T = max(T, clearance.held_swing_time(fk, q0, q1, p_G, cfg.HELD_SWING_MAX_SPEED_MS, cfg.SWING_CHECK_STEP_RAD))
+     opening = world.player.last_opening if opening is None else float(opening)
+     world.start_joint(q0, q1, T, opening)
+     world.advance_logged(T + cfg.HOLD_AFTER_MOTION_S)
+@@ -126,7 +139,7 @@
+         q = world.kin.solve_ik_best(X, world.arm_q())
+         if q is None:
+             raise MotionFailed(f"{label}: no IK solution for the hand pose (is it reachable from this station?)")
+-    return move_arm_to_q(world, q, opening, label)
++    return move_arm_to_q(world, q, opening, label, held=held)
+ 
+ 
+ def run_plan(world, waypoints, speed: float, label: str = "", on_waypoint=None, held=None) -> PhaseResult:
+--- a/jenga/clearance.py
++++ b/jenga/clearance.py
+@@ -152,6 +152,23 @@
+     return best, what
+ 
+ 
++def held_swing_time(fk, q0, q1, p_G, v_max: float, step_rad: float) -> float:
++    """The shortest duration of a joint move from q0 to q1 that keeps a point held in the hand (the held block's
++    centre) at or below v_max.  The move follows the executor's bell-shaped profile, whose path speed peaks at
++    2 / T (jenga/controller.py MotionPlayer), so T = 2 x (largest distance the point moves per unit of path) / v_max.
++
++    Inputs: fk (function: arm angles -> 4x4 gripper pose X_RG), q0, q1 (start and end arm angles), p_G (the point in
++    the gripper frame, m), v_max (m/s), step_rad (sampling step along the path, as joint_path).
++    Returns: the duration in s (0 for no motion).
++    """
++    q0, q1 = np.asarray(q0, float), np.asarray(q1, float)
++    n = max(int(np.ceil(np.max(np.abs(q1 - q0)) / step_rad)), 1)
++    s = np.linspace(0.0, 1.0, n + 1)
++    p = np.array([(fk(q0 + si * (q1 - q0)) @ np.append(p_G, 1.0))[:3] for si in s])
++    rate = np.max(np.linalg.norm(np.diff(p, axis=0), axis=1) / np.diff(s))  # m per unit of path
++    return 2.0 * rate / v_max
++
++
+ def preference_order(solutions, q_ref, margin_fn, good_margin: float) -> list:
+     """IK solutions in the order the executor prefers them (the rule of kinematics.solve_ik_best): those at least
+     good_margin from every joint limit, nearest q_ref first; then the rest, largest margin first.  The first
+--- a/tests/test_swing_clearance.py
++++ b/tests/test_swing_clearance.py
+@@ -65,6 +65,25 @@
+                            X_WR=lambda: np.eye(4), block_poses=lambda: dict(poses))
+ 
+ 
++class TestHeldSwingTime(unittest.TestCase):
++    @staticmethod
++    def fk(q):
++        """The hand turns about z by q[0] and slides along x by q[1]."""
++        X = clearance._pose((q[1], 0.0, 0.0), q[0])
++        return X
++
++    def test_a_straight_slide_peaks_at_2_x_distance_over_T(self):
++        T = clearance.held_swing_time(self.fk, np.zeros(7), np.r_[0.0, 0.3, np.zeros(5)], np.zeros(3), 0.5, 0.01)
++        self.assertAlmostEqual(T, 2 * 0.3 / 0.5)
++
++    def test_a_turn_moves_a_point_far_from_the_axis_faster(self):
++        q1 = np.r_[np.pi / 2, np.zeros(6)]
++        near = clearance.held_swing_time(self.fk, np.zeros(7), q1, np.array([0.1, 0, 0]), 0.5, 0.01)
++        far = clearance.held_swing_time(self.fk, np.zeros(7), q1, np.array([0.4, 0, 0]), 0.5, 0.01)
++        self.assertAlmostEqual(near, 2 * 0.1 * np.pi / 2 / 0.5, places=3)  # arc length r x angle
++        self.assertAlmostEqual(far / near, 4.0, places=3)
++
++
+ class TestChooseSwing(unittest.TestCase):
+     def setUp(self):
+         self.cfg = make_cfg(CHECK_SWING_CLEARANCE=True)
+@@ -128,6 +147,29 @@
+         ch.assert_not_called()
+         move.assert_called_once()
+ 
++    def _swing_world(self, limit):
++        w = SimpleNamespace(cfg=make_cfg(HELD_SWING_MAX_SPEED_MS=limit), arm_q=lambda: np.zeros(7),
++                            X_WR=lambda: np.eye(4), block_poses=lambda: {5: clearance._pose((0.6, 0, 0))},
++                            player=SimpleNamespace(last_opening=0.11, stop=lambda *a: None),
++                            kin=SimpleNamespace(gripper_pose=lambda q: SimpleNamespace(
++                                GetAsMatrix4=lambda: clearance._pose((0, 0, 0), q[0])),
++                                joint_limit_margin=lambda q: 1.0),
++                            advance_logged=lambda t: None)
++        w.start_joint = mock.Mock()
++        return w
++
++    def test_held_swing_is_slowed_only_with_a_block_and_the_limit_on(self):
++        q1 = np.r_[1.0, np.zeros(6)]  # 1 rad about z: 2 s at 0.5 rad/s; the block 0.6 m out moves 0.6 m
++        T = lambda w, held: w.start_joint.call_args.args[2]  # noqa: E731
++        w = self._swing_world(0.0)
++        executor.move_arm_to_q(w, q1, held=5)
++        self.assertAlmostEqual(T(w, 5), 2.0)  # limit off: as before
++        w = self._swing_world(0.5)
++        executor.move_arm_to_q(w, q1)
++        self.assertAlmostEqual(T(w, None), 2.0)  # nothing held: as before
++        executor.move_arm_to_q(w, q1, held=5)
++        self.assertAlmostEqual(T(w, 5), 2 * 0.6 / 0.5, places=3)  # 2.4 s: the block peaks at 0.5 m/s
++
+     def test_on_uses_the_clearance_choice(self):
+         from pydrake.all import RigidTransform
+         w, best = self._world(True)
+@@ -137,6 +179,7 @@
+         best.assert_not_called()
+         self.assertEqual(ch.call_args.args[2:4], (0.11, 3))  # the wider of the current and new opening; the held block
+         np.testing.assert_array_equal(move.call_args.args[1], np.full(7, 2.0))
++        self.assertEqual(move.call_args.kwargs["held"], 3)  # passed on, for the held-swing speed limit
+         self.assertEqual(w.last_swing, {"swing_tried": 1})
+ 
+ 

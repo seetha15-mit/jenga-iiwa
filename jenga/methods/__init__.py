@@ -12,7 +12,8 @@ Everything shared (tower state, legal pulls, collapse, logging) lives outside th
 
 import importlib
 
-REGISTRY = {"end_pinch": "jenga.methods.end_pinch", "push": "jenga.methods.push"}
+REGISTRY = {"end_pinch": "jenga.methods.end_pinch", "push": "jenga.methods.push",
+            "mixed": "jenga.methods.mixed"}  # mixed: push for middle blocks, end-pinch for edges (D-07)
 
 
 def get_method(name: str):

@@ -88,6 +88,24 @@ class RobotKinematics:
         self.plant.SetPositions(ctx, result.GetSolution(ik.q()))  # as in the pset: read the arm's part back
         return np.asarray(self.plant.GetPositions(ctx, self.iiwa), float)
 
+    def ik_solutions(self, X_RG: RigidTransform, q_ref, tries: int = 30, seed: int = 0) -> list:
+        """Every distinct IK solution for the gripper pose X_RG, found from q_ref and the same random starts as
+        solve_ik_best (same tries and seed), so the swing-clearance check (jenga/clearance.py) can choose among them.
+
+        Inputs: X_RG (target gripper pose, robot frame), q_ref (current arm angles, tried first as a start),
+        tries (number of random starts), seed (random seed for the starts).
+        Returns: list of arm-angle arrays (rad), each within the joint limits; solutions closer than 1e-3 rad in
+        every joint count once.  Empty if the pose cannot be reached.
+        """
+        rng = np.random.default_rng(seed)
+        q_ref = np.asarray(q_ref, float)
+        out = []
+        for g in [q_ref] + [rng.uniform(self.lower, self.upper) for _ in range(tries)]:
+            q = self.solve_ik(X_RG, g)
+            if q is not None and all(np.max(np.abs(q - s)) > 1e-3 for s in out):
+                out.append(q)
+        return out
+
     def solve_ik_best(self, X_RG: RigidTransform, q_ref, tries: int = 30, seed: int = 0, good_margin: float = 0.15):
         """A joint-limit-safe IK solution for X_RG that is also close to q_ref, or None.
 

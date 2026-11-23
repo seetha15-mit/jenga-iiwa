@@ -58,7 +58,15 @@ def can_place(tower, layer: int, slot: int, cfg) -> bool:
 
 
 def choose_place_station(tower, layer: int, slot: int, cfg, current_station: int) -> int:
+    """Each edge has one station.  The middle (two) goes from the station of an edge already in the
+    layer, so both blocks are placed with the same hand bias (D-08); otherwise the nearer one."""
     options = place_stations(tower, layer, slot, cfg)
+    if slot == 1:
+        for edge in (0, 2):
+            if (layer, edge) in tower.slot_map:
+                same = [k for k in place_stations(tower, layer, edge, cfg) if k in options]
+                if same:
+                    return same[0]
     return base.nearest_station(cfg, options, current_station)
 
 
@@ -114,7 +122,7 @@ def plan_pull(X_RB, cfg):
     wayplist.append(Waypoint(pickpoint,  cfg.FINGER_OPEN_COMMAND_M))
     wayplist.append(Waypoint(pickpoint,  L-cfg.FINGER_SQUEEZE_M))     # 2. move onto the block
     wayplist.append(Waypoint(pickpoint,  L-2*cfg.FINGER_SQUEEZE_M,1.0))# 3. SAME pose, close = grasp
-    wayplist.append(Waypoint(pickpounce, L-2*cfg.FINGER_SQUEEZE_M))   # 4. retreat holding it
+    wayplist.append(Waypoint(pickpounce, L-2*cfg.FINGER_SQUEEZE_M,0.1))   # 4. retreat holding it
     wayplist.append(Waypoint(pickpounce@upoffset,L-2*cfg.FINGER_SQUEEZE_M))
     return wayplist
     
@@ -154,8 +162,8 @@ def plan_place(X_RT, cfg):
     placepoint = X_RT@X_TG
     placepounce = placepoint@offset
     wayplist = []
-    wayplist.append(Waypoint(placepounce, L-cfg.FINGER_SQUEEZE_M))   
-    wayplist.append(Waypoint(placepoint,  L-cfg.FINGER_SQUEEZE_M))    
+    wayplist.append(Waypoint(placepounce, L-2*cfg.FINGER_SQUEEZE_M))   
+    wayplist.append(Waypoint(placepoint,  L-2*cfg.FINGER_SQUEEZE_M))    
     wayplist.append(Waypoint(placepoint,  cfg.FINGER_OPEN_COMMAND_M))
     wayplist.append(Waypoint(placepoint,  cfg.FINGER_OPEN_COMMAND_M, 1.0))   
     wayplist.append(Waypoint(placepounce, cfg.FINGER_OPEN_COMMAND_M))   

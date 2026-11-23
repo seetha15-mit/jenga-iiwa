@@ -27,9 +27,174 @@ class TestStrategies(unittest.TestCase):
 
     def test_team_stubs_raise_not_implemented(self):
         cfg, t = make_cfg(), TowerState(make_cfg())
-        for name in ("rule_based", "perception", "force_guided"):
+        for name in ("perception", "force_guided"):  # rule_based is written (Katie)
             with self.assertRaises(NotImplementedError):
                 strategies.get_strategy(name)(t, [0], cfg, np.random.default_rng(0))
+
+
+class TestRuleBased(unittest.TestCase):
+    """Katie's rule-based strategy: the layer-stability rule and the basic contract of select_block."""
+
+    def setUp(self):
+        self.cfg = make_cfg(N_LAYERS_START=3)  # block ids below are for a 3-layer tower
+        self.t = TowerState(self.cfg)
+
+    def test_layer_stable(self):
+        from jenga.strategies import rule_based
+        self.assertTrue(rule_based.layer_stable(self.t, 0))  # full layer 0: blocks 1 and 2 stay
+        self.t.place(1, 3, 0)  # take the middle of layer 0 away: blocks 0 and 2 (edges) are left
+        self.assertFalse(rule_based.layer_stable(self.t, 0))  # only edge 2 would be left
+        self.assertFalse(rule_based.layer_stable(self.t, 2))
+
+    def test_never_leaves_a_lone_edge_and_picks_a_candidate(self):
+        select = strategies.get_strategy("rule_based")
+        self.t.place(1, 3, 0)
+        cands = [b for b in self.t.pull_candidates() if end_pinch.can_pull(self.t, b, self.cfg)]  # 0, 2, 3, 5
+        picks = {select(self.t, cands, self.cfg, np.random.default_rng(s)) for s in range(20)}
+        self.assertTrue(picks <= set(cands))
+        self.assertFalse(picks & {0, 2})
+
+    def test_a_block_set_down_end_for_end_has_not_moved(self):
+        from jenga.strategies import rule_based
+        X = self.t.target_pose(0, 0) @ np.diag([-1.0, -1.0, 1.0, 1.0])  # turned 180 deg about its own z
+        self.t.update_poses({0: X})
+        self.assertAlmostEqual(rule_based.blockdisturbance(self.t, 0, self.cfg), 0.0, places=6)
+        tilt = np.eye(4)
+        tilt[:3, :3] = [[1, 0, 0], [0, np.cos(0.0349), -np.sin(0.0349)], [0, np.sin(0.0349), np.cos(0.0349)]]
+        self.t.update_poses({0: self.t.target_pose(0, 0) @ tilt})  # a real 2 deg tilt still counts
+        self.assertAlmostEqual(rule_based.blockdisturbance(self.t, 0, self.cfg), 1.0, places=2)
+
+    def test_column_filter_skips_hollow_columns_while_an_intact_one_is_left(self):
+        from jenga.strategies import rule_based
+        select = strategies.get_strategy("rule_based")
+        cfg = make_cfg(N_LAYERS_START=6)
+        t = TowerState(cfg)
+        t.remove_from_slot(3)  # layer 1 slot 0 is gone: layer 3 slot 0 (block 9) now has a hollow column
+        self.assertFalse(rule_based.column_intact(t, 9))
+        self.assertTrue(rule_based.column_intact(t, 11))
+        cands = [9, 11]  # the two edges of layer 3
+        off = {select(t, cands, make_cfg(N_LAYERS_START=6, RB_COLUMN_FILTER=False), np.random.default_rng(k)) for k in range(40)}
+        on = {select(t, cands, make_cfg(N_LAYERS_START=6, RB_COLUMN_FILTER=True), np.random.default_rng(k)) for k in range(40)}
+        self.assertIn(9, off)  # V2's weighted pick takes the hollow one some of the time
+        self.assertEqual(on, {11})
+        # only hollow blocks left: falls back to them, as V2 would
+        self.assertEqual(select(t, [9], make_cfg(N_LAYERS_START=6, RB_COLUMN_FILTER=True), np.random.default_rng(0)), 9)
+
+    def test_mixed_coin_chooses_edge_or_middle(self):
+        select = strategies.get_strategy("rule_based")
+        t = TowerState(make_cfg(N_LAYERS_START=6))
+        cands = [b for b in range(12)]  # layers 0-3: edges and middles (block id = 3 * layer + slot)
+        kinds = lambda p: [t.blocks[select(t, cands, make_cfg(N_LAYERS_START=6, RB_P_END=p), np.random.default_rng(k))].slot == 1
+                           for k in range(300)]  # noqa: E731
+        self.assertFalse(any(kinds(1.0)))  # always an edge
+        self.assertTrue(all(kinds(0.0)))  # always a middle
+        self.assertTrue(0.2 < np.mean(kinds(2 / 3)) < 0.45)  # about 1/3 middles
+
+    def test_mixed_falls_back_to_the_other_kind(self):
+        select = strategies.get_strategy("rule_based")
+        cfg = make_cfg(N_LAYERS_START=6)
+        t = TowerState(cfg)
+        t.remove_from_slot(0)
+        t.remove_from_slot(2)  # layer 0 has only its middle: every edge in layers 2 and 4 now has a hollow column
+        for k in range(20):  # only hollow edges (layer 2) and a middle (layer 1): the middle, even with the coin on edges
+            self.assertEqual(select(t, [6, 8, 4], make_cfg(N_LAYERS_START=6, RB_P_END=1.0), np.random.default_rng(k)), 4)
+            self.assertIn(select(t, [6, 8], make_cfg(N_LAYERS_START=6, RB_P_END=0.0), np.random.default_rng(k)), (6, 8))  # no middle: an edge
+
+    def test_middles_use_their_own_weights_and_skip_the_column_filter(self):
+        select = strategies.get_strategy("rule_based")
+        t = TowerState(make_cfg(N_LAYERS_START=6))
+        middles = [1, 4, 7, 10]
+        low = dict(HEIGHT=2.0, FULL_LAYERS_NEAR=0.0, SELFSTILL=0.0, OTHERNEARSTILL=0.0, SELF_FULL=0.0, CLEAR_OF_TOP=0.0,
+                   CLEAR_OF_BOTTOM=0.0)
+        cfg = make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=low)
+        self.assertEqual({select(t, middles, cfg, np.random.default_rng(k)) for k in range(20)}, {1})  # lowest middle
+        no_bottom = make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=dict(low, CLEAR_OF_BOTTOM=5.0))
+        self.assertNotIn(1, {select(t, middles, no_bottom, np.random.default_rng(k)) for k in range(20)})
+        t.remove_from_slot(1)  # layer 0 middle gone: the layer-2 middle (7) has a hollow column but is still taken
+        high = make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=dict(low, HEIGHT=-2.0))
+        self.assertEqual({select(t, [4, 7], high, np.random.default_rng(k)) for k in range(20)}, {7})
+
+    def _mid_tower(self):
+        t = TowerState(make_cfg(N_LAYERS_START=6))
+        t.remove_from_slot(6)  # layer 2 loses an edge: the layer-1 middle (4) is now under an incomplete layer,
+        return t               # the layer-0 middle (1) is still under a full one; edge 12 (layer 4) is now hollow
+
+    def test_full_above_filter_prefers_middles_under_a_full_layer(self):
+        select = strategies.get_strategy("rule_based")
+        t = self._mid_tower()
+        w = dict(HEIGHT=-2.0, FULL_LAYERS_NEAR=0.0, SELFSTILL=0.0, OTHERNEARSTILL=0.0, SELF_FULL=0.0, CLEAR_OF_TOP=0.0,
+                 CLEAR_OF_BOTTOM=0.0, FULL_ABOVE=0.0)  # prefers higher middles: the risky one (4)
+        cfg = lambda on: make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=w, RB_MID_FULL_ABOVE=on)  # noqa: E731
+        picks = lambda c, on: {select(t, c, cfg(on), np.random.default_rng(k)) for k in range(20)}  # noqa: E731
+        self.assertEqual(picks([1, 4], False), {4})
+        self.assertEqual(picks([1, 4], True), {1})
+        self.assertEqual(picks([4, 9], True), {9})  # no good middle, a good edge: the edge, though the coin says middle
+        self.assertEqual(picks([4, 12], True), {4})  # no good middle, only a hollow edge: the risky middle
+
+    def test_full_above_score_term(self):
+        select = strategies.get_strategy("rule_based")
+        t = self._mid_tower()
+        w = dict(HEIGHT=-2.0, FULL_LAYERS_NEAR=0.0, SELFSTILL=0.0, OTHERNEARSTILL=0.0, SELF_FULL=0.0, CLEAR_OF_TOP=0.0,
+                 CLEAR_OF_BOTTOM=0.0, FULL_ABOVE=0.0)
+        cfg = lambda fa: make_cfg(N_LAYERS_START=6, RB_P_END=0.0, RB_MID_W=dict(w, FULL_ABOVE=fa), RB_MID_FULL_ABOVE=False)  # noqa: E731  (the score alone)
+        self.assertEqual({select(t, [1, 4], cfg(0.0), np.random.default_rng(k)) for k in range(20)}, {4})
+        self.assertEqual({select(t, [1, 4], cfg(2.0), np.random.default_rng(k)) for k in range(20)}, {1})
+
+    def test_falls_back_when_no_pull_is_safe(self):
+        select = strategies.get_strategy("rule_based")
+        self.t.place(1, 3, 0)  # layer 0: only the edges 0 and 2 left, neither is safe to pull
+        self.assertIn(select(self.t, [0, 2], self.cfg, np.random.default_rng(0)), (0, 2))
+
+    def test_height_rule_prefers_lower_layers(self):
+        from jenga.strategies import rule_based
+        only_height = make_cfg(N_LAYERS_START=3, RB_W_HEIGHT=1.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
+                               RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=0.0, RB_W_CLEAR_OF_BOTTOM=0.0)
+        s = rule_based.layerscore(self.t, [0, 1], only_height)
+        self.assertGreater(s[0], s[1])
+
+    def test_the_layer_under_the_top_is_scored_down(self):
+        from jenga.strategies import rule_based
+        only_top = make_cfg(N_LAYERS_START=3, RB_W_HEIGHT=0.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
+                            RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=2.0, RB_W_CLEAR_OF_BOTTOM=0.0)
+        s = rule_based.layerscore(self.t, [0, 1], only_top)  # layer 2 is the highest complete: layer 1 is under it
+        self.assertEqual((s[0], s[1]), (2.0, 0.0))
+        for b, slot in ((0, 0), (2, 2), (1, 1)):  # complete layer 3 (from layer 0's blocks): layer 2 is now under the top
+            self.t.place(b, 3, slot)
+        s = rule_based.layerscore(self.t, [1, 2], only_top)
+        self.assertEqual((s[1], s[2]), (2.0, 0.0))
+
+    def test_full_layer_is_a_weighted_term_not_a_filter(self):
+        from jenga.strategies import rule_based
+        self.t.place(0, 3, 0)  # layer 0 now has two blocks (1, 2); layer 1 is still full; top layer is 3
+        only = dict(N_LAYERS_START=3, RB_W_HEIGHT=0.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
+                    RB_W_OTHERNEARSTILL=0.0, RB_W_CLEAR_OF_TOP=0.0)
+        full_wins = rule_based.layerscore(self.t, [0, 1], make_cfg(RB_W_SELF_FULL=1.0, **only))
+        self.assertGreater(full_wins[1], full_wins[0])  # only "full" counts: the full layer 1
+        selfcands = [0, 1]  # layer 0 (two blocks) can still be chosen: it is scored, not filtered out
+        self.assertEqual(sorted(rule_based.layerscore(self.t, selfcands, make_cfg(RB_W_SELF_FULL=1.0, **only))), [0, 1])
+
+    def test_clear_of_top_can_cover_two_layers(self):
+        from jenga.strategies import rule_based
+        only = dict(N_LAYERS_START=3, RB_W_HEIGHT=0.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
+                    RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=2.0, RB_W_CLEAR_OF_BOTTOM=0.0)
+        s1 = rule_based.layerscore(self.t, [0, 1], make_cfg(RB_CLEAR_OF_TOP_LAYERS=1, **only))  # top full layer is 2
+        self.assertEqual((s1[0], s1[1]), (2.0, 0.0))
+        s2 = rule_based.layerscore(self.t, [0, 1], make_cfg(RB_CLEAR_OF_TOP_LAYERS=2, **only))
+        self.assertEqual((s2[0], s2[1]), (0.0, 0.0))
+
+    def test_clear_of_bottom_affects_layer_0_only(self):
+        from jenga.strategies import rule_based
+        cfg = make_cfg(N_LAYERS_START=3, RB_W_HEIGHT=0.0, RB_W_FULL_LAYERS_NEAR=0.0, RB_W_SELFSTILL=0.0,
+                       RB_W_OTHERNEARSTILL=0.0, RB_W_SELF_FULL=0.0, RB_W_CLEAR_OF_TOP=0.0, RB_W_CLEAR_OF_BOTTOM=2.0)
+        s = rule_based.layerscore(self.t, [0, 1], cfg)
+        self.assertEqual((s[0], s[1]), (0.0, 2.0))
+
+    def test_reproducible_with_the_same_seed(self):
+        select = strategies.get_strategy("rule_based")
+        cands = [0, 2, 3, 5]
+        a = [select(self.t, cands, self.cfg, np.random.default_rng(3)) for _ in range(5)]
+        b = [select(self.t, cands, self.cfg, np.random.default_rng(3)) for _ in range(5)]
+        self.assertEqual(a, b)
 
     def test_push_places_like_end_pinch(self):
         # after the regrab the block is held end-pinch, so push uses end-pinch's place rules (D-21, D-22)

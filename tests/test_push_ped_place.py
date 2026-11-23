@@ -36,9 +36,11 @@ class TestPedPlace(unittest.TestCase):
         self.assertLess(self.wps[2].opening, self.cfg.FINGER_OPEN_COMMAND_M)
 
     def test_lift_comes_last_and_hand_is_open(self):
-        last, before = self.wps[-1], self.wps[-2]
-        self.assertGreater(last.X_RG.translation()[2], before.X_RG.translation()[2])
-        self.assertEqual(before.opening, self.cfg.FINGER_OPEN_COMMAND_M)
+        # the plan may end with a still hold at the top, so find the last leg that rises
+        zs = [w.X_RG.translation()[2] for w in self.wps]
+        lift = max(i for i in range(1, len(zs)) if zs[i] > zs[i - 1] + 1e-9)
+        self.assertEqual(zs[-1], max(zs))
+        self.assertEqual(self.wps[lift - 1].opening, self.cfg.FINGER_OPEN_COMMAND_M)
 
     def test_release_is_below_the_post_top(self):
         # the block bottom at the set point sits 2 mm under PEDESTAL_HEIGHT_M (see plan_ped_place)
@@ -46,6 +48,25 @@ class TestPedPlace(unittest.TestCase):
         dz = hold[1].X_RG.translation()[2]                   # hand height above a block whose bottom is at z = 0
         set_z = self.wps[1].X_RG.translation()[2]
         self.assertAlmostEqual(set_z - dz, self.cfg.PEDESTAL_HEIGHT_M - 0.002, places=6)
+
+
+@unittest.skipUnless(HAVE_DRAKE, "needs pydrake")
+class TestPedTarget(unittest.TestCase):
+    def test_default_target_is_the_post_2_mm_down(self):
+        cfg = make_cfg()
+        X = push.pedestal_target(cfg)
+        d = cfg.PEDESTAL_DISTANCE_M / np.sqrt(2)
+        np.testing.assert_allclose(X.translation(), [cfg.STATION_STANDOFF_M - d, d, cfg.PEDESTAL_HEIGHT_M - 0.002])
+
+    def test_the_plan_moves_rigidly_with_its_target(self):
+        cfg = make_cfg()
+        base_plan = push.plan_ped_place(RigidTransform(), cfg)
+        shift = np.array([0.003, -0.002, 0.012])  # e.g. the block slid 12 mm down the fingers
+        X_T = push.pedestal_target(cfg)
+        moved = push.plan_ped_place(RigidTransform(), cfg, target=RigidTransform(X_T.rotation(), X_T.translation() + shift))
+        for a, b in zip(base_plan, moved):
+            np.testing.assert_allclose(b.X_RG.translation() - a.X_RG.translation(), shift, atol=1e-12)
+            self.assertEqual(a.opening, b.opening)
 
 
 if __name__ == "__main__":

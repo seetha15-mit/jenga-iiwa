@@ -53,7 +53,9 @@ class TowerState:
         return np.array([1.0, 0.0]) if self.long_axis(layer) == "y" else np.array([0.0, 1.0])
 
     def target_pose(self, layer: int, slot: int) -> np.ndarray:
-        """4x4 world pose of the block body frame (bottom-face centre) at (layer, slot)."""
+        """4x4 world pose of the block body frame (bottom-face centre) at (layer, slot), with BLOCK_GAP_M between
+        neighbours and between layers: the tower is BUILT this way and settles onto itself.  Places do not aim here
+        in height: mover.release_target aims at the measured top of the layer below (D-25)."""
         L, W, H = self.dims
         gap = self.cfg.BLOCK_GAP_M
         cx, cy = self.cfg.TOWER_CENTER_XY
@@ -102,11 +104,12 @@ class TowerState:
 
     # ------------------------------------------------------------ where a pulled block goes
     def placement_slots(self) -> List[Tuple[int, int]]:
-        """Empty slots in the layer being built, edges first and the middle last.
+        """Empty slots in the layer being built: edge, middle, edge (D-08).  The middle never goes down
+        between two placed blocks, and it is placed from the first edge's side (end_pinch.choose_place_station).
         If the top layer is complete this is the new layer above it."""
         top = self.top_layer()
         layer = top + 1 if self.is_complete(top) else top
-        return [(layer, s) for s in (0, 2, 1) if (layer, s) not in self.slot_map]
+        return [(layer, s) for s in (0, 1, 2) if (layer, s) not in self.slot_map]
 
     # ------------------------------------------------------------ changing the state
     def remove_from_slot(self, block_id: int) -> None:

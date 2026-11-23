@@ -13,7 +13,9 @@ export DRAKE_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 SCRATCH_ROOT=$(readlink -f $HOME/orcd/scratch)
 OUT_ROOT=${OUT_ROOT:-$SCRATCH_ROOT/jenga_scratch}   # default: throwaway scratch folder
 REPLAY=${REPLAY:-1}                                  # 1 = record replays (default for now); REPLAY=0 for the final run
+# SET="RB_W_HEIGHT=-1.0 RB_W_CLEAR_OF_TOP=0": config overrides for these jobs only (space-separated, no commas)
 
 apptainer exec -B $SCRATCH_ROOT --pwd $SLURM_SUBMIT_DIR jenga.sif \
   python run_one_trial.py --strategy ${STRATEGY:-random} --trial $SLURM_ARRAY_TASK_ID \
-  --mover real --out-root $OUT_ROOT ${TURNS:+--turns $TURNS} $([ "$REPLAY" = "1" ] && echo --replay)
+  --mover real --out-root $OUT_ROOT ${TURNS:+--turns $TURNS} $([ "$REPLAY" = "1" ] && echo --replay) \
+  ${SET:+--set $SET}

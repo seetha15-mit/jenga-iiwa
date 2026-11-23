@@ -15,21 +15,21 @@ Frames: W = world (tower centre at the origin, table top at z = 0).
 """
 
 # ------------------------------------------------------------------ what to run
-N_LAYERS_START = 3  # [course] start with 3 layers; the TA said make 3 work before 12
+N_LAYERS_START = 6  # [user] 3 works with both methods, so 6 now; the TA said make 3 work before 12 (R-04)
 N_TRIALS = 10  # [course] at least 10 trials per approach
 BASE_SEED = 1000  # [estimate] trial i uses seed BASE_SEED + i (first block + hidden friction)
 MAX_TURNS = 10  # [estimate] a trial ends after this many turns even without a collapse
 MAX_CONSECUTIVE_FAILURES = 2  # [estimate] a trial ends after this many failed turns in a row
 START_SETTLE_S = 1.0  # [estimate] the tower stands this long before the first turn, so a replay opens on the intact tower
 MOVER = "fake"  # [user] "fake" = teleport placeholder (results INVALID), "real" = the team's steps
-EXTRACTION_METHOD = "push"  # [user] "end_pinch" (default) or "push" (push, pull, pedestal regrab, place; D-21)
+EXTRACTION_METHOD = "mixed"  # [user] "mixed" (default: push middles, end-pinch edges; D-07, D-26), "end_pinch" (edges only) or "push" (middles only: push, pull, pedestal regrab, place; D-21)
 STRATEGY = "random"  # [course] "random", "rule_based", "perception", "force_guided"
 COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 
 # ------------------------------------------------------------------ blocks
 BLOCK_REAL_M = (0.075, 0.025, 0.015)  # [course] a real Jenga block: length, width, height
 BLOCK_SCALE = 1.45  # [user] ONE scale for all three dimensions (decided from the gripper numbers)
-BLOCK_GAP_M = 0.0005  # [estimate] gap between neighbouring blocks (prototype value, not verified)
+BLOCK_GAP_M = 0.0005  # [estimate] gap between neighbouring blocks, and between layers when the tower is built (prototype value, not verified); places aim at the measured top instead (D-25)
 BLOCK_DENSITY = 700.0  # [estimate] kg/m^3; gives about 0.06 kg per block at this scale
 FRICTION_MODE = "global"  # [user] "global" (all equal) or "random" (varied, hidden from strategies)
 FRICTION_GLOBAL = 0.5  # [estimate] used when FRICTION_MODE = "global"
@@ -40,6 +40,8 @@ HYDROELASTIC_MODULUS = 1.0e6  # [course] what the psets use for their boxes
 FINGER_OPEN_COMMAND_M = 0.110  # [measured] largest opening; the pad gap is this + 5 mm
 PAD_GAP_EXTRA_M = 0.005  # [measured] pad gap = command + 5 mm (pads never get closer than 5 mm)
 FINGER_HEIGHT_M = 0.020  # [measured] fingers and pads are 20 mm tall
+FINGER_THICKNESS_M = 0.012  # [measured] finger collision box along G x (schunk_wsg_50_with_tip.sdf: 0.012 x 0.082 x 0.02)
+PAD_THICKNESS_M = 0.003  # [measured] pad on the finger's inner face (same file: 0.003 x 0.02 x 0.02)
 FINGER_CLOSED_WIDTH_M = 0.035  # [measured] two closed fingers together
 PAD_CENTRE_FROM_G_M = 0.108  # [measured] distance from G to the middle of the pads along G y
 FINGERTIP_REACH_M = 0.118  # [measured] distance from G to the fingertips along G y
@@ -77,6 +79,7 @@ ARM_CARRY_Q = (0.0, 0.4, 0.0, -1.6, 0.0, 1.2, 0.0)  # [measured] the psets' home
 CONTACT_MODEL = "hydroelastic"  # [estimate] "hydroelastic" or "point"; TODO compare (DECISIONS.md)
 CONTACT_APPROXIMATION = "lagged"  # [measured] "sap", "lagged", "similar" or "default" (Drake's own); with "sap" a pull dragged the layer above out with the block (Drake documents SAP 'gliding' in sliding contact), with "lagged" it came out cleanly (DECISIONS.md D-10)
 PLANT_TIME_STEP = 0.005  # [estimate] seconds per physics step; try 0.002 etc. when testing speed
+CMD_SUBSTEPS = 5  # [user] the arm command is integrated this many times per physics step (1 ms; the old continuous integrator took ~1 RK3 step, 3 samples, per physics step; measured; D-24)
 ARM_KP = (1.0e4, 1.0e4, 1.0e4, 1.0e4, 5.0e3, 3.0e3, 2.0e3)  # [estimate] arm joint stiffness (Nm/rad); the arm is gravity-compensated (see DECISIONS.md)
 ARM_KD = (500.0, 500.0, 300.0, 300.0, 100.0, 60.0, 40.0)  # [estimate] arm joint damping (Nm s/rad)
 FINGER_KP = 2000.0  # [estimate] finger stiffness (N/m): grip force = this x how far past the block the fingers are commanded
@@ -88,12 +91,55 @@ JOINT_SPEED_RAD_S = 0.5  # [estimate] speed of joint-space moves
 HOLD_AFTER_MOTION_S = 0.3  # [estimate] stand still this long after each motion
 SAMPLE_DT_S = 0.02  # [estimate] how often to log wrist force during a motion
 TRACKING_WARN_M = 0.005  # [estimate] warn if the hand ends this far from its last waypoint
+PUSH_MIDDLE_ONLY = True  # [user] the push method takes middle blocks only: pushing an edge block moved a 6-layer tower 11.4 mm against 0.27 mm for end-pinch (D-07, measured, one trial each)
+PUSH_MIN_LAYERS_ABOVE = 2  # [measured] the push method takes a block only with at least this many COMPLETE layers above it (on a fresh 6-layer tower: layers 0-3). Layer 4, under the top layer, dragged the layer above at every pull speed tried (push sweep); 0 = no limit
+PUSH_MAX_LAYER = 3  # [measured] the push method takes a block only up to this layer (None = no cap): push is tuned on layers 0-3, and in 6 mixed smoke games both pushes above layer 3 knocked the top layer off; cap 3 vs none 4.77 vs 4.79 blocks per game, p = 0.49 (D-26)
+PULL_INSIDE_SPEED_MS = 0.02  # [measured] push method's pull-out while the block is still in the tower (push.plan_pull). Of the speeds tested (0.02, 0.03, 0.05, 0.07, 0.1 m/s; middle blocks of layers 0-4, both ends), 0.02 is the only one where the layer above moved at most ~1 mm in every run (1.1 mm); 0.03 gave 3.4 mm on layer 4, 0.1 up to 251 mm. Faster pulls track worse, so the block tips more in the hand. Layer 4 near end collapses at every speed
+PULL_OUT_SPEED_MS = 0.1  # [estimate] the rest of the push method's 200 mm pull-out; 0.1 = as before
+CHECK_SWING_CLEARANCE = True  # [measured] joint-space moves take the first IK solution (in the usual order) whose path keeps the gripper and held block SWING_CLEARANCE_M clear (jenga/clearance.py); on for every method: needed by push (its pedestal swing went through the table), no significant change for end-pinch (200 paired games, DECISIONS O-1); False = the old choice exactly
+SWING_CLEARANCE_M = 0.010  # [estimate] wanted clearance on a swing; must stay above what the 10 mm point spacing can miss (about 7 mm, clearance.GRID_M); every logged pedestal swing has an IK solution clear by this (kinematic estimate, push sweep)
+SWING_CHECK_STEP_RAD = 0.035  # [estimate] a swing's path is checked every 2 degrees of its largest joint turn
 JOINT_LIMIT_WARN_RAD = 0.05  # [estimate] warn if an arm joint ends this close to its limit
 
 # ------------------------------------------------------------------ turn outcomes and collapse
 COLLAPSE_DISPLACEMENT_M = 0.02  # [estimate] any other block moving more than this ends the trial
 PLACE_TOLERANCE_M = 0.02  # [estimate] a block this close to its target slot counts as replaced
+PLACE_CORRECT_GRASP = True  # [user] before a place, read where the block sits in the hand (simulator truth; a real robot needs a camera) and shift the aim by the offset: it slid 3-6 mm during the base roll (measured, Mac, 3 turns; D-08)
+PEDESTAL_CORRECT_GRASP = True  # [user] push method: before setting the block on the pedestal, read where it sits in the hand (simulator truth, as PLACE_CORRECT_GRASP) and shift the set-down by the offset: it slides 6-15 mm down the fingers during the swing, so a fixed set-down drove it into the post and it tipped off (push sweep and games)
 PULL_MOVED_M = 0.02  # [estimate] a block that moved less than this was not pulled out
+
+# ------------------------------------------------------------------ rule-based strategy (jenga/strategies/rule_based.py)
+# Each factor is scored about 0 to 1; a weight says how much it counts.  0 turns a factor off.
+RB_P_END = 2 / 3  # [user] mixed method: chance of taking an edge block when both an edge and a middle are on offer (2 of a layer's 3 blocks are edges); with no good edge (only hollow ones) a middle is taken, with no middle an edge
+RB_MID_FULL_ABOVE = True  # [measured] count a middle as good only when the layer right above it is complete, as RB_COLUMN_FILTER does for edges (a risky middle is still taken before a hollow edge). Mixed, trials 0-99: pushes under a full layer ended the game 5 of 136, under a layer missing a block 69 of 136; 4.77 -> 6.19 blocks per game (D-26)
+# Layer weights for MIDDLE blocks (push); the RB_W_* settings below are the edge-block set.  A layer has one middle, so
+# the block weights do not apply to middles.  Same keys and meaning as RB_W_*.
+RB_MID_W = dict(  # [user] layer weights for middle blocks; each value has its own tag
+    HEIGHT=2.0,  # [user] prefer lower layers: push is tuned on layers 0-3; its only tower collapses were on layer 4 (2 of 12 pushes, 12 push-only random games)
+    FULL_LAYERS_NEAR=0.5,  # [user] copied from the edge set
+    SELFSTILL=1.0,  # [estimate] copied from the edge set
+    OTHERNEARSTILL=1.0,  # [estimate] copied from the edge set
+    SELF_FULL=0.75,  # [user] copied from the edge set
+    CLEAR_OF_TOP=2.0,  # [estimate] copied from the edge set
+    CLEAR_OF_BOTTOM=0.0,  # [user] middles allowed on layer 0: 1 of 12 layer-0 pushes ended the game, at the regrab (push-only games); a middle leaves the tower on both edges
+    FULL_ABOVE=0.0,  # [user] prefer middles whose layer right above is complete: the score version of RB_MID_FULL_ABOVE, off (2.0 instead of the filter: 5.11 vs 6.19 blocks per game, D-26)
+)
+RB_W_HEIGHT = 0.0  # [user] layer: prefer LOWER layers; off in V2 (cluster, 100 paired trials: V2 4.23 blocks per trial vs 3.15 random, 3.39 with height 1.0 and the old full weights; D-23)
+RB_W_FULL_LAYERS_NEAR = 0.5  # [user] layer: prefer layers whose neighbours above and below are still full (halved in V2, D-23)
+RB_W_SELFSTILL = 1.0  # [estimate] layer: prefer layers whose blocks have not moved from their slots
+RB_W_OTHERNEARSTILL = 1.0  # [estimate] layer: prefer layers whose neighbour layers have not moved
+RB_W_SELF_FULL = 0.75  # [user] layer: prefer layers that still have all three blocks (halved in V2; full layer + full neighbours drew B into mid-tower pulls, D-23)
+RB_W_CLEAR_OF_TOP = 2.0  # [estimate] layer: avoid the layer right under the highest complete layer (pulling block 12 from layer 4 under full layer 5 dropped the top: Mac, 1 run; on a fresh tower it was fine)
+RB_CLEAR_OF_TOP_LAYERS = 1  # [user] how many layers under the highest complete layer count for RB_W_CLEAR_OF_TOP (2 cost 0.6 blocks per trial against V2: cluster, 100 trials, D-23)
+RB_W_CLEAR_OF_BOTTOM = 2.0  # [user] layer: avoid layer 0 only (V2; +0.46 blocks per trial over the same weights without it, cluster, 100 trials, D-23)
+RB_LAYER_TIE = 0.1  # [estimate] layers scoring within this of the best are tied; one is chosen at random
+RB_W_EDGE = 1.0  # [estimate] block: prefer edge blocks (only matters for push; end-pinch takes edges only)
+RB_W_BALANCED = 1.0  # [estimate] block: prefer pulls that keep the support below the layer balanced
+RB_W_SELFSTILL_BLOCK = 1.0  # [estimate] block: prefer blocks that have not moved from their slot
+RB_COLUMN_FILTER = True  # [measured] before scoring, drop blocks with a hollow column (a same-slot block missing in a same-direction layer below) while any block with an intact column is a candidate; False = V2 as in D-23. V2 end-pinch 3.99 -> 6.27 blocks per game on fresh trials 200-299 (DECISIONS O-8)
+RB_W_BLOCKS_BELOW = 1.0  # [estimate] block: prefer blocks with their column below still filled
+RB_DISTURB_M = 0.002  # [estimate] a block moved this far counts as 1 unit of disturbance (same as STATIC_MAX_MOVE_M)
+RB_DISTURB_DEG = 2.0  # [estimate] a block turned this much counts as 1 unit of disturbance
 
 # ------------------------------------------------------------------ replay and logs
 RECORD_REPLAY = True  # [user] record each trial for a normal-speed replay afterwards
@@ -101,6 +147,11 @@ RUNS_DIR = "runs_scratch"  # [user] real results go here
 FAKE_RUNS_DIR = "runs_fake"  # [user] fake-mover runs go here, never into results
 ASSET_DIR = "generated_assets"  # [estimate] SDF files written at run time
 PRINT_SIM_SPEED = True  # [user] print simulated seconds per wall second
+
+# ------------------------------------------------------------------ development log (jenga/diaglog.py; off for results)
+DIAG_LOG_LEVEL = 0  # [user] 0 off; 1 one row per step of a turn (steps.csv); 2 also one row per block per step (step_blocks.csv)
+DIAG_LOG_FEATURES = ("block", "neighbours", "hand", "joints")  # [user] column groups in steps.csv; "waypoints" adds a row per waypoint (jenga/diaglog.py)
+DIAG_FIRST_BLOCK = None  # [user] development only: force the first pick to this block id (breaks the random first pick, R-03; never for results)
 
 # ------------------------------------------------------------------ sensing (notes only; the team decides)
 ENABLE_WRIST_FORCE_LOG = False  # [user] log the raw wrist force during motions

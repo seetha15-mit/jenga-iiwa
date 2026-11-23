@@ -2,7 +2,8 @@
 
 Adapted from our own pick_and_place.py pset solutions: pose_distance, pose_delta, waypoint_times,
 timed_trajectories and JointVelocity are the pset's feedforward differential-IK controller
-(gripper velocity -> pseudo-inverse Jacobian -> joint velocities -> Integrator -> iiwa.position).
+(gripper velocity -> pseudo-inverse Jacobian -> joint velocities -> Integrator -> iiwa.position);
+our integrator is discrete, at the plant's step (DiscreteIntegrator, D-24).
 Cite the course for it in the report.
 
 The plant itself is built by hand in the pset style (jenga/scene.py), with PD-controlled joints.
@@ -21,6 +22,7 @@ joint ends near one.  Swapping the controller later (e.g. impedance control): re
 
 import numpy as np
 from pydrake.all import (
+    EventStatus,
     JacobianWrtVariable,
     LeafSystem,
     PiecewisePolynomial,
@@ -100,6 +102,31 @@ def JointVelocity(arm_plant):
         [6, 7], 0, 7, None, solve, output_depends_on_input=True,
         input_port_name=["V_RG", "iiwa.position"], output_port_name="iiwa.velocity", name="JointVelocity",
     )
+
+
+class DiscreteIntegrator(LeafSystem):
+    """Joint-angle command: x[n+1] = x[n] + h u[n], updated every h seconds (h = the plant's step).
+
+    Replaces the pset's continuous Integrator.  A continuous one is stepped by the simulator's own
+    integrator, which also stops at every replay frame, so recording a replay changed the arm command and
+    flipped a close-call pull (trial 40 on the cluster: 6 blocks without replay, 4 with).  Updated at fixed
+    times, the command no longer depends on when anything else stops the simulator (D-24)."""
+
+    def __init__(self, size: int, h: float):
+        super().__init__()
+        self._h = float(h)
+        self._u = self.DeclareVectorInputPort("u", size)
+        state = self.DeclareDiscreteState(size)
+        self.DeclareStateOutputPort("y", state)
+        self.DeclarePeriodicDiscreteUpdateEvent(self._h, 0.0, self._update)
+
+    def _update(self, context, discrete_state):
+        x = context.get_discrete_state_vector().CopyToVector()
+        discrete_state.get_mutable_vector().SetFromVector(x + self._h * self._u.Eval(context))
+        return EventStatus.Succeeded()
+
+    def set_integral_value(self, context, q) -> None:
+        context.SetDiscreteState(np.asarray(q, float))
 
 
 # ---------------------------------------------------------------- systems whose python state changes between AdvanceTo calls

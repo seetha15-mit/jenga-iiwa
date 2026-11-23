@@ -1,0 +1,95 @@
+Block end heights in the development log: a testing patch, kept for debugging.
+
+What it does: with DIAG_LOG_LEVEL >= 1 and the "block" feature on, steps.csv gets two more columns:
+inner_end_up_mm and outer_end_up_mm, how far each END of the moving block has risen (world z) since the step began;
+inner = the end nearer the tower centre.  Plus a unit test (jenga/diaglog.py, tests/test_diaglog.py).
+
+Why: block_tilt_deg says a block tipped, not which way.  The end heights tell whether the block's inner end is
+riding up on the layer below or its outer end is sagging out of the hand: that is how the push method's pull
+problems (dragging the layer above, tilt on the pedestal) were told apart.  Useful for any pull or place problem.
+
+To use it:   git apply workfiles/end_heights_testing.patch    (independent of the other patches; both can be on)
+             then run with DIAG_LOG_LEVEL=1 (cluster scripts: --set DIAG_LOG_LEVEL=1)
+Take it out again before committing (git apply -R workfiles/end_heights_testing.patch).
+Made against the commit that added this file; check with `git apply --check` first.
+
+--- a/jenga/diaglog.py
++++ b/jenga/diaglog.py
+@@ -8,7 +8,8 @@
+               a waypoint row are since the previous waypoint.  The simulator stops at each waypoint (no effect
+               on the result, D-24)
+   block       the pulled block against its pose at the START of the turn, in that pose's own axes: along its long
+-              axis (for a push: how far it came out), sideways, up (mm); yaw and tilt (deg)
++              axis (for a push: how far it came out), sideways, up (mm); yaw and tilt (deg); and how much each END
++              has risen (mm, world z): the inner end (nearer the tower centre now) and the outer end
+   neighbours  how far the OTHER blocks moved in THIS step: the worst one (id, layer, mm, tilt), the worst in the
+               same layer, the layer above, the layer below, any other layer; and the worst since the turn began
+   hand        the hand's distance from its last waypoint at the end of a plan (the executor's tracking error),
+@@ -27,9 +28,11 @@
+ import numpy as np
+ 
+ from jenga import base
++from jenga import geometry as geo
+ 
+ _GROUPS = {
+-    "block": ["block_along_mm", "block_side_mm", "block_up_mm", "block_yaw_deg", "block_tilt_deg"],
++    "block": ["block_along_mm", "block_side_mm", "block_up_mm", "block_yaw_deg", "block_tilt_deg", "inner_end_up_mm",
++              "outer_end_up_mm"],
+     "neighbours": ["worst_id", "worst_layer", "worst_mm", "worst_tilt_deg", "same_layer_mm", "above_mm",
+                    "below_mm", "other_layers_mm", "worst_since_turn_mm"],
+     "hand": ["tracking_mm", "in_hand_x_mm", "in_hand_y_mm", "in_hand_z_mm", "err_x_mm", "err_y_mm", "err_z_mm",
+@@ -69,7 +72,7 @@
+     "waypoints" on, the executor calls waypoint(name, i, wp) at each waypoint of a plan in between."""
+ 
+     def __init__(self, world, tower, block_id, cfg):
+-        self.world, self.block = world, block_id
++        self.world, self.block, self.cfg = world, block_id, cfg
+         self.features = set(cfg.DIAG_LOG_FEATURES)
+         self.level = cfg.DIAG_LOG_LEVEL
+         self.columns = step_columns(self.features)
+@@ -81,6 +84,16 @@
+         self.prev_wp, self.t_prev_wp = self.prev, self.t_prev  # at the last waypoint row
+         self.rows, self.block_rows = [], []
+ 
++    def _end_rises(self, P0, P) -> dict:
++        """How much each end of the block (centre of its end face) has risen since P0, mm.  Inner = the end nearer
++        the tower centre now."""
++        half = geo.block_dims(self.cfg)[0] / 2
++        c = np.append(self.cfg.TOWER_CENTER_XY, 0.0)
++        ends = [(P[:3, 3] + s * half * P[:3, 0], P0[:3, 3] + s * half * P0[:3, 0]) for s in (-1, 1)]
++        inner, outer = sorted(ends, key=lambda e: np.linalg.norm((e[0] - c)[:2]))
++        return dict(inner_end_up_mm=_r((inner[0][2] - inner[1][2]) * 1000),
++                    outer_end_up_mm=_r((outer[0][2] - outer[1][2]) * 1000))
++
+     def begin_step(self) -> None:
+         self.world.last_swing = None  # the executor fills it when this step's swing is checked
+ 
+@@ -94,6 +107,7 @@
+             row.update(block_along_mm=_r(d[0] * 1000), block_side_mm=_r(d[1] * 1000), block_up_mm=_r(d[2] * 1000),
+                        block_yaw_deg=_r(_yaw_deg(P0[:3, :3], P[:3, :3])),
+                        block_tilt_deg=_r(_tilt_deg(P0[:3, :3], P[:3, :3])))
++            row.update(self._end_rises(P0, P))
+         others = [b for b in now if b != self.block]
+         move = {b: float(np.linalg.norm(now[b][:3, 3] - ref[b][:3, 3])) for b in others}
+         if "neighbours" in self.features and others:
+--- a/tests/test_diaglog.py
++++ b/tests/test_diaglog.py
+@@ -54,6 +54,18 @@
+         self.assertEqual(set(r), set(log.columns))
+         self.assertEqual([r[f"q{i}_deg"] for i in range(1, 8)], [0.0] * 7)  # StandInWorld's arm is at zero
+ 
++    def test_end_rises_tell_the_inner_end_from_the_outer(self):
++        log = diaglog.StepLog(self.w, self.tower, 4, self.cfg)  # middle block: its centre is over the tower centre
++        X = self.w.poses[4].copy()
++        X[:3, 3] += X[:3, 0] * 0.04  # 40 mm out along its long axis: the +x end is now the outer end
++        a = np.radians(1.0)  # and tipped about its own y axis: the +x end goes down, the -x end up
++        X[:3, :3] = X[:3, :3] @ np.array([[np.cos(a), 0, np.sin(a)], [0, 1, 0], [-np.sin(a), 0, np.cos(a)]])
++        self.w.poses[4] = X
++        log.step("pull", None)
++        r, half = log.rows[0], diaglog.geo.block_dims(self.cfg)[0] / 2
++        self.assertAlmostEqual(r["outer_end_up_mm"], round(-half * np.sin(a) * 1000, 2))
++        self.assertAlmostEqual(r["inner_end_up_mm"], round(half * np.sin(a) * 1000, 2))
++
+     def test_moves_are_per_step_and_level_2_has_every_block(self):
+         log = diaglog.StepLog(self.w, self.tower, 4, self.cfg)
+         self.w.poses[7][:3, 3] += [0, 0, 0.002]

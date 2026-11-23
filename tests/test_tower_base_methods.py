@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -10,7 +11,7 @@ from tests.helpers import make_cfg
 
 class TestTower(unittest.TestCase):
     def setUp(self):
-        self.cfg = make_cfg()
+        self.cfg = make_cfg(N_LAYERS_START=3)  # the expected block ids below are for a 3-layer tower
         self.t = TowerState(self.cfg)
 
     def test_initial_state(self):
@@ -35,14 +36,14 @@ class TestTower(unittest.TestCase):
     def test_legal_pulls_exclude_top_complete_layer(self):
         self.assertEqual(sorted(self.t.pull_candidates()), [0, 1, 2, 3, 4, 5])
 
-    def test_placement_goes_on_a_new_layer_edges_first(self):
-        self.assertEqual(self.t.placement_slots(), [(3, 0), (3, 2), (3, 1)])
+    def test_placement_goes_on_a_new_layer_edge_middle_edge(self):
+        self.assertEqual(self.t.placement_slots(), [(3, 0), (3, 1), (3, 2)])
 
     def test_after_replacing_one_block(self):
         self.t.place(0, 3, 0)
         self.assertEqual(self.t.top_layer(), 3)
         self.assertFalse(self.t.is_complete(3))
-        self.assertEqual(self.t.placement_slots(), [(3, 2), (3, 1)])
+        self.assertEqual(self.t.placement_slots(), [(3, 1), (3, 2)])
         # layer 3 (being built) and layer 2 (highest complete) are excluded; block 0 left layer 0
         self.assertEqual(sorted(self.t.pull_candidates()), [1, 2, 3, 4, 5])
 
@@ -61,7 +62,7 @@ class TestTower(unittest.TestCase):
 
 class TestBase(unittest.TestCase):
     def setUp(self):
-        self.cfg = make_cfg()
+        self.cfg = make_cfg(N_LAYERS_START=3)  # the expected block ids below are for a 3-layer tower
         self.t = TowerState(self.cfg)
 
     def test_every_station_sees_the_tower_straight_ahead_at_the_standoff(self):
@@ -122,7 +123,7 @@ class TestBase(unittest.TestCase):
 
 class TestEndPinchRules(unittest.TestCase):
     def setUp(self):
-        self.cfg = make_cfg()
+        self.cfg = make_cfg(N_LAYERS_START=3)  # the expected block ids below are for a 3-layer tower
         self.t = TowerState(self.cfg)
 
     def test_only_edge_blocks_can_be_pulled(self):
@@ -136,11 +137,29 @@ class TestEndPinchRules(unittest.TestCase):
         self.assertEqual(end_pinch.place_stations(self.t, 3, 1, self.cfg), [1, 3])
         self.assertEqual(end_pinch.choose_place_station(self.t, 3, 1, self.cfg, current_station=3), 3)
 
+    def test_middle_is_placed_from_the_placed_edges_side(self):
+        for edge in (0, 2):
+            t = TowerState(self.cfg)
+            t.place(0, 3, edge)
+            [k_edge] = end_pinch.place_stations(t, 3, edge, self.cfg)
+            for current in range(4):
+                self.assertEqual(end_pinch.choose_place_station(t, 3, 1, self.cfg, current), k_edge)
+
     def test_every_empty_slot_can_be_placed_by_end_pinch(self):
         self.assertTrue(all(end_pinch.can_place(self.t, l, s, self.cfg) for l, s in self.t.placement_slots()))
 
     def test_choose_station_for_a_pull(self):
         self.assertEqual(end_pinch.choose_station(self.t, 0, self.cfg, current_station=2), 0)
+
+    def test_mixed_takes_every_block_with_the_right_method(self):
+        mixed = get_method("mixed")
+        cfg = SimpleNamespace(**dict(vars(self.cfg), PUSH_MIN_LAYERS_ABOVE=0))  # the layer rule is tested in TestPushRules
+        for b, rec in self.t.blocks.items():
+            self.assertIs(mixed.method_for(self.t, b), push if rec.slot == 1 else end_pinch, f"block {b}")
+            self.assertTrue(mixed.can_pull(self.t, b, cfg), f"block {b}")  # middles too, unlike end-pinch
+        for layer, slot in self.t.placement_slots():
+            self.assertEqual(mixed.choose_place_station(self.t, layer, slot, self.cfg, 0),
+                             end_pinch.choose_place_station(self.t, layer, slot, self.cfg, 0))
 
     def test_method_registry(self):
         self.assertIs(get_method("end_pinch"), end_pinch)
@@ -150,16 +169,38 @@ class TestEndPinchRules(unittest.TestCase):
 
 class TestPushRules(unittest.TestCase):
     def setUp(self):
-        self.cfg = make_cfg()
+        self.cfg = make_cfg(N_LAYERS_START=3)  # the expected block ids below are for a 3-layer tower
         self.t = TowerState(self.cfg)
 
     def angles(self, block_id):
         return {self.cfg.STATION_ANGLES_DEG[k] for k in base.push_stations(self.t, block_id)}
 
     def test_every_block_has_two_push_stations_middle_ones_too(self):
+        cfg = make_cfg(N_LAYERS_START=3, PUSH_MIDDLE_ONLY=False, PUSH_MIN_LAYERS_ABOVE=0)
         for bid in self.t.blocks:  # includes the middle blocks 1, 4, 7
             self.assertEqual(len(base.push_stations(self.t, bid)), 2, f"block {bid}")
-            self.assertTrue(push.can_pull(self.t, bid, self.cfg))
+            self.assertTrue(push.can_pull(self.t, bid, cfg))
+
+    def test_middle_only_takes_slot_1_only(self):
+        cfg = make_cfg(N_LAYERS_START=3, PUSH_MIDDLE_ONLY=True, PUSH_MIN_LAYERS_ABOVE=0)
+        self.assertEqual([b for b in self.t.blocks if push.can_pull(self.t, b, cfg)], [1, 4, 7])
+
+    def test_layer_rule_counts_complete_layers_above(self):
+        cfg = make_cfg(N_LAYERS_START=6, PUSH_MIDDLE_ONLY=True, PUSH_MIN_LAYERS_ABOVE=2)
+        t = TowerState(cfg)
+        legal = [b for b in t.pull_candidates() if push.can_pull(t, b, cfg)]
+        self.assertEqual(legal, [1, 4, 7, 10])  # layer 4 (block 13) has only layer 5 above
+        t.remove_from_slot(1)  # layer 0 now has a hole: it no longer counts for anything below it (nothing is)
+        t.remove_from_slot(10)  # layer 3 is incomplete, so layer 2 has only layers 4 and 5 complete above
+        self.assertEqual(push.layers_above(t, 7), 2)
+        self.assertEqual(push.layers_above(t, 4), 3)
+
+    def test_layer_cap(self):
+        cfg = make_cfg(N_LAYERS_START=6, PUSH_MIDDLE_ONLY=True, PUSH_MIN_LAYERS_ABOVE=0, PUSH_MAX_LAYER=None)
+        t = TowerState(cfg)
+        self.assertEqual([b for b in t.pull_candidates() if push.can_pull(t, b, cfg)], [1, 4, 7, 10, 13])
+        capped = make_cfg(N_LAYERS_START=6, PUSH_MIDDLE_ONLY=True, PUSH_MIN_LAYERS_ABOVE=0, PUSH_MAX_LAYER=2)
+        self.assertEqual([b for b in t.pull_candidates() if push.can_pull(t, b, capped)], [1, 4, 7])
 
     def test_push_stations_face_the_block_ends(self):
         # layer 0: long axis along world y, so the robot faces +y or -y; layer 1: long axis along x

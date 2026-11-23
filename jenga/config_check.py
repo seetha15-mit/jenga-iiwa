@@ -3,14 +3,17 @@
 check_tags(path)   every setting must end with a source tag: [user] [course] [measured] [derived] [estimate]
 check_values(cfg)  settings that cannot work, or that probably will not
 describe(cfg)      the numbers a person wants to see (block size, margins, mass)
+apply_overrides(cfg, items)   NAME=VALUE overrides for one run (run_one_trial.py --set); config.py is unchanged
 """
 
+import ast
 import re
 from pathlib import Path
 
 from jenga import geometry as geo
 
 TAGS = ("[user]", "[course]", "[measured]", "[derived]", "[estimate]")
+DIAG_FEATURES = ("block", "neighbours", "hand", "joints", "waypoints")  # what jenga/diaglog.py knows
 _ASSIGN = re.compile(r"^([A-Z][A-Z0-9_]*)\s*=")
 
 
@@ -27,12 +30,12 @@ def check_tags(path) -> list:
 def check_values(cfg) -> list:
     w = []
     choices = {
-        "MOVER": ("fake", "real"), "EXTRACTION_METHOD": ("end_pinch", "push"),
+        "MOVER": ("fake", "real"), "EXTRACTION_METHOD": ("end_pinch", "push", "mixed"),
         "STRATEGY": ("random", "rule_based", "perception", "force_guided"),
         "COLLAPSE_DETECTOR": ("basic", "advanced"), "BASE_MODE": ("mobile", "fixed"),
         "CONTACT_MODEL": ("hydroelastic", "point"), "FRICTION_MODE": ("global", "random"),
         "CONTACT_APPROXIMATION": ("sap", "lagged", "similar", "default"),
-        "FIRST_LAYER_LONG_AXIS": ("x", "y"),
+        "FIRST_LAYER_LONG_AXIS": ("x", "y"), "DIAG_LOG_LEVEL": (0, 1, 2),
     }
     for name, allowed in choices.items():
         if getattr(cfg, name) not in allowed:
@@ -61,6 +64,8 @@ def check_values(cfg) -> list:
     #     w.append("ARM_KP/ARM_KD need 7 entries and BASE_KP/BASE_KD need 3.")
     if cfg.PLANT_TIME_STEP is None or cfg.PLANT_TIME_STEP <= 0:
         w.append("PLANT_TIME_STEP must be a positive number (the plant is built by hand and needs one).")
+    if not isinstance(cfg.CMD_SUBSTEPS, int) or cfg.CMD_SUBSTEPS < 1:
+        w.append("CMD_SUBSTEPS must be a whole number >= 1 (arm-command updates per physics step, D-24).")
     if cfg.N_LAYERS_START < 2:
         w.append("N_LAYERS_START must be at least 2: there is nothing legal to pull from one layer.")
     if cfg.MAX_TURNS < 1 or cfg.N_TRIALS < 1:
@@ -71,6 +76,11 @@ def check_values(cfg) -> list:
         w.append("BASE_TRAVEL_RADIUS_M is smaller than STATION_STANDOFF_M: the base would roll through the tower.")
     if len(cfg.STATION_ANGLES_DEG) < 1:
         w.append("STATION_ANGLES_DEG needs at least one station.")
+    unknown = set(cfg.DIAG_LOG_FEATURES) - set(DIAG_FEATURES)
+    if unknown:
+        w.append(f"DIAG_LOG_FEATURES has unknown names {sorted(unknown)}; known: {DIAG_FEATURES}.")
+    if cfg.DIAG_FIRST_BLOCK is not None:
+        w.append(f"DIAG_FIRST_BLOCK = {cfg.DIAG_FIRST_BLOCK}: the first pick is forced, not random (R-03). Development only, never results.")
     if cfg.MOVER == "fake":
         w.append("MOVER = 'fake': runs use the teleport placeholder and are INVALID for results (this is the default until the team's steps exist).")
     return w
@@ -87,3 +97,18 @@ def describe(cfg) -> str:
         f"robot         : base mode {cfg.BASE_MODE}, {len(cfg.STATION_ANGLES_DEG)} stations at {cfg.STATION_STANDOFF_M} m",
         f"run           : method {cfg.EXTRACTION_METHOD}, strategy {cfg.STRATEGY}, mover {cfg.MOVER}, contact {cfg.CONTACT_MODEL}",
     ])
+
+
+def apply_overrides(cfg, items) -> list:
+    """Set config values for this run only, from strings like "RB_W_HEIGHT=-1.0" (a cluster job's --set).
+    The value is read as a Python literal (number, string, tuple, True/False).  Only existing settings can be
+    overridden, so a typo stops the run instead of being ignored.  Returns the (name, value) pairs applied."""
+    applied = []
+    for item in items:
+        name, sep, text = item.partition("=")
+        if not sep or not hasattr(cfg, name):
+            raise ValueError(f"--set {item!r}: expected NAME=VALUE with NAME a setting in config.py")
+        value = ast.literal_eval(text)
+        setattr(cfg, name, value)
+        applied.append((name, value))
+    return applied

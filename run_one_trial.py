@@ -1,11 +1,13 @@
-"""Run ONE trial.  python run_one_trial.py --strategy random --trial 3 --out-root /path/to/runs"""
+"""Run ONE trial.  python run_one_trial.py --strategy random --trial 3 --out-root /path/to/runs
+--set NAME=VALUE ... overrides config.py values for this run only (weight variants on the cluster); the
+overrides are written to overrides.txt in the trial folder."""
 import argparse
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import config as _config
-from jenga import mover as mover_mod
+from jenga import config_check, mover as mover_mod
 from jenga.evaluation import harness
 
 ap = argparse.ArgumentParser()
@@ -15,12 +17,14 @@ ap.add_argument("--mover", default="real", choices=["fake", "real"])
 ap.add_argument("--turns", type=int)
 ap.add_argument("--replay", action="store_true")
 ap.add_argument("--out-root", required=True)
+ap.add_argument("--set", nargs="*", default=[], metavar="NAME=VALUE")
 a = ap.parse_args()
 
 cfg = SimpleNamespace(**{k: v for k, v in vars(_config).items() if k.isupper()})
 cfg.STRATEGY, cfg.MOVER, cfg.RECORD_REPLAY = a.strategy, a.mover, a.replay
 if a.turns:
     cfg.MAX_TURNS = a.turns
+overrides = config_check.apply_overrides(cfg, a.set)
 
 out_dir = Path(a.out_root) / f"{a.strategy}_trial{a.trial:02d}"  # same name every time, so reruns don't duplicate
 if (out_dir / "trials.csv").exists():
@@ -29,6 +33,7 @@ if (out_dir / "trials.csv").exists():
 out_dir.mkdir(parents=True, exist_ok=True)
 for stale in ("turns.csv", "trials.csv"):  # clear a partial run
     (out_dir / stale).unlink(missing_ok=True)
+(out_dir / "overrides.txt").write_text("".join(f"{n} = {v!r}\n" for n, v in overrides) or "none\n")
 cfg.ASSET_DIR = str(out_dir / "assets")  # per-trial SDF files
 
 try:

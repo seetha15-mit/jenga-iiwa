@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from jenga import clearance, geometry as geo, methods, strategies
+from jenga import clearance, diaglog, geometry as geo, methods, strategies
 from jenga.errors import MotionFailed
 from jenga.evaluation import collapse, outcomes
 from jenga.tower import TowerState
@@ -31,7 +31,7 @@ TURN_COLUMNS = [
     "trial", "seed", "strategy", "extraction_method", "mover", "friction_mode", "n_layers_start", "block_scale",
     "contact_model", "turn", "block_id", "layer", "slot", "target_layer", "target_slot", "station_pull",
     "station_place", "outcome", "collapse", "collapse_reason", "mover_error", "arm_collisions_unchecked",
-    "sim_seconds", "wall_seconds",
+    "sim_seconds", "wall_seconds", "place_across_mm", "place_along_mm", "place_height_mm",
 ]
 TRIAL_COLUMNS = [
     "trial", "seed", "strategy", "extraction_method", "mover", "friction_mode", "n_layers_start", "block_scale",
@@ -52,6 +52,23 @@ def run_directory(cfg, mover, strategy: str, stamp: str = None) -> Path:
     root = Path(cfg.RUNS_DIR if mover.TAG == "real" else cfg.FAKE_RUNS_DIR)
     stamp = stamp or time.strftime("%Y%m%d_%H%M%S")
     return root / f"{strategy}_{stamp}"
+
+
+def place_error(tower, target, poses, block):
+    """Where the block ended against its target slot, with the slot's height taken from the MEASURED top of the
+    layer below (mover.release_target, the height the place aims at, D-25), not the built height: the tower
+    settles about 0.5 mm a layer, which is not a placement error.
+
+    Inputs: tower (TowerState, before this turn's bookkeeping update), target ((layer, slot)), poses (block id ->
+    4x4 world pose after the turn), block (the block that was moved).
+    Returns: (4x4 slot pose used, distance m, (across, along, height) m in the slot's frame: along = the block's
+    long axis, across = horizontal and perpendicular to it (what leaves room for a neighbour), height = up).
+    """
+    from jenga.mover import release_target  # pure numpy; the place aims at the same height
+    X_T = release_target(tower, target[0], target[1], poses, tower.cfg, held=block)
+    d = poses[block][:3, 3] - X_T[:3, 3]
+    along, across, height = X_T[:3, :3].T @ d
+    return X_T, float(np.linalg.norm(d)), (float(across), float(along), float(height))
 
 
 def _append_csv(path: Path, columns, row: dict) -> None:
@@ -106,6 +123,11 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
 
         if turn == 0:
             block = int(first_pick_rng.choice(np.array(candidates)))  # course rule: first block is random
+            if cfg.DIAG_FIRST_BLOCK is not None:  # development only (R-03); drawn above anyway so the stream is unchanged
+                if cfg.DIAG_FIRST_BLOCK not in candidates:
+                    raise ValueError(f"DIAG_FIRST_BLOCK {cfg.DIAG_FIRST_BLOCK} is not a legal pull: {candidates}")
+                block = int(cfg.DIAG_FIRST_BLOCK)
+                log(f"[dev] first block forced to {block} (DIAG_FIRST_BLOCK): not a random pick, never for results")
             first_block = block
         else:
             block = int(select(tower, candidates, cfg, strategy_rng))
@@ -122,13 +144,22 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
             info = mover.do_turn(world, tower, block, target, cfg)
         except MotionFailed as e:  # a motion could not be done: logged as a failed turn
             mover_error = str(e)
+        dlog = getattr(mover, "last_diag", None)  # development log (DIAG_LOG_LEVEL > 0), written even after a failure
+        if dlog is not None:
+            ids = dict(trial=trial, turn=turn, block_id=block)
+            for r in dlog.rows:
+                _append_csv(out_dir / "steps.csv", list(ids) + dlog.columns, dict(ids, **r))
+            for r in dlog.block_rows:
+                _append_csv(out_dir / "step_blocks.csv", list(ids) + diaglog.BLOCK_COLUMNS, dict(ids, **r))
         after = world.block_poses()
         others = max(float(np.linalg.norm(after[b][:3, 3] - before[b][:3, 3])) for b in before if b != block)
-        place_err = float(np.linalg.norm(after[block][:3, 3] - tower.target_pose(*target)[:3, 3]))
-        log(f"   [check] other blocks moved at most {others * 1000:.2f} mm; placed block {place_err * 1000:.1f} mm from its slot")
+        X_slot, place_err, (p_across, p_along, p_height) = place_error(tower, target, after, block)
+        log(f"   [check] other blocks moved at most {others * 1000:.2f} mm; placed block {place_err * 1000:.1f} mm from its slot "
+            f"(across {p_across * 1000:.1f}, along {p_along * 1000:.1f}, height {p_height * 1000:.1f} mm; height against the "
+            f"measured top of the layer below)")
         turns += 1
 
-        outcome = outcomes.classify_turn(before[block], after[block], tower.target_pose(*target), cfg)
+        outcome = outcomes.classify_turn(before[block], after[block], X_slot, cfg)  # slot at the measured height
         # the tower bookkeeping follows what really happened
         tower.update_poses(after)
         if outcome == "replaced":
@@ -143,6 +174,8 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
                    target_slot=target[1], station_pull=getattr(info, "station_pull", ""),
                    station_place=getattr(info, "station_place", ""), outcome=outcome, collapse=verdict.stop,
                    collapse_reason=verdict.reason, mover_error=mover_error, sim_seconds=round(world.time() - sim0, 2),
+                   place_across_mm=round(p_across * 1000, 2), place_along_mm=round(p_along * 1000, 2),
+                   place_height_mm=round(p_height * 1000, 2),
                    wall_seconds=round(time.time() - wall0, 1))
         _append_csv(out_dir / "turns.csv", TURN_COLUMNS, row)
         log(f"[trial {trial} turn {turn}] block {block} (layer {layer}, slot {slot}) -> {outcome}"

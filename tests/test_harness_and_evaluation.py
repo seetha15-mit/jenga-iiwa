@@ -149,6 +149,34 @@ class TestHarness(unittest.TestCase):
         self.assertIn(s["end_reason"], ("no_candidates", "no_placement_slot"))
 
 
+class TestPlaceError(unittest.TestCase):
+    def test_settling_is_not_an_error_and_the_directions_are_split(self):
+        cfg = make_cfg()
+        tower = TowerState(cfg)
+        top = cfg.N_LAYERS_START  # the new layer
+        poses = {b: r.X_WB.copy() for b, r in tower.blocks.items()}
+        for b in tower.layer_blocks(top - 1):
+            poses[b][2, 3] -= 0.002  # the layer below settled 2 mm
+        X = np.array(tower.target_pose(top, 0), float)
+        X[2, 3] = np.mean([poses[b][2, 3] for b in tower.layer_blocks(top - 1)]) + tower.dims[2]  # resting on the real top
+        X[:3, 3] += X[:3, 1] * 0.001  # but 1 mm off sideways: an error
+        poses[1] = X
+        _, dist, (across, along, height) = harness.place_error(tower, (top, 0), poses, 1)
+        self.assertAlmostEqual(across, 0.001)
+        self.assertAlmostEqual(along, 0.0)
+        self.assertAlmostEqual(height, 0.0)
+        self.assertAlmostEqual(dist, 0.001)
+
+    def test_the_turn_row_has_the_three_directions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = make_cfg(RECORD_REPLAY=False, MAX_TURNS=1)
+            harness.run_trial(cfg, 0, FakeMover(), Path(tmp), make_world=MockWorld, log=lambda *_: None)
+            row = read(Path(tmp) / "turns.csv")[0]
+        # the fake mover puts the block at the BUILT slot, one layer gap above the real top of the layer below
+        self.assertEqual([float(row[c]) for c in ("place_across_mm", "place_along_mm", "place_height_mm")],
+                         [0.0, 0.0, round(make_cfg().BLOCK_GAP_M * 1000, 2)])
+
+
 class TestResultsGuard(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
