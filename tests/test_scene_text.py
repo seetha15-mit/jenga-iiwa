@@ -115,10 +115,16 @@ class TestSceneFiles(unittest.TestCase):
         scene, sim, tower, cfg = self.build()
         root = parse_sdf(sim._write_assets(tower)["base"])
         joints = {j.get("name"): j for j in root.iter("joint")}
-        self.assertEqual({n: j.get("type") for n, j in joints.items()},
-                         {"base_x": "prismatic", "base_y": "prismatic", "base_yaw": "revolute"})
-        self.assertEqual(joints["base_x"].find("parent").text, "world")
+        # self.assertEqual({n: j.get("type") for n, j in joints.items()},
+        #                  {"base_x": "prismatic", "base_y": "prismatic", "base_yaw": "revolute"})
+        # self.assertEqual(joints["base_x"].find("parent").text, "world")
+        # self.assertEqual(joints["base_yaw"].find("child").text, "base_link")
+        self.assertEqual({n: j.get("type") for n, j in joints.items()}, {"base_yaw": "revolute"})
+        self.assertEqual(joints["base_yaw"].find("parent").text, "world")
         self.assertEqual(joints["base_yaw"].find("child").text, "base_link")
+        r = cfg.STATION_STANDOFF_M
+        self.assertAlmostEqual(float(joints["base_yaw"].find("pose").text.split()[0]), r)  # axis at the tower centre
+        
         self.assertIsNotNone(root.find(".//effort"))  # effort limits make the joints actuated
         self.assertIsNone(root.find(".//collision"))  # visual only: the base never collides
 
