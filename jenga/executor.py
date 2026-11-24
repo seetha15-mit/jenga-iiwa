@@ -30,6 +30,7 @@ class PhaseResult:
     duration_s: float
     tracking_error_m: float = 0.0
     joint_margin_rad: float = 0.0
+    stopped_at: int = -1  # index of the waypoint where stop_at halted the motion, or -1
 
 
 def _resolve(cfg, waypoints):
@@ -56,14 +57,19 @@ def _check_after(world, label, target_X=None) -> PhaseResult:
     return PhaseResult(label, 0.0, err, margin)
 
 
-def run_waypoints(world, waypoints, speed: float, label: str = "", on_waypoint=None, first_index: int = 1) -> PhaseResult:
+def run_waypoints(world, waypoints, speed: float, label: str = "", on_waypoint=None, first_index: int = 1,
+                  force_trace=None, stop_at=None) -> PhaseResult:
     """Straight-line (Cartesian) motion through the waypoints, starting from where the hand is now.
 
     Inputs: world (the Sim), waypoints (list of Waypoint, robot frame), speed (m/s), label (text for messages),
     on_waypoint (function (i, waypoint) called when the hand is due at each waypoint, for the development log,
     jenga/diaglog.py; the simulator stops there, which does not change the result: D-24, and the push sweep gave
-    the same turn with and without the stops), first_index (the index of the first waypoint passed to on_waypoint).
-    Returns: the PhaseResult (tracking error at the last waypoint, joint margin).
+    the same turn with and without the stops), first_index (the index of the first waypoint passed to on_waypoint),
+    force_trace (a list: the raw wrist force is appended to it every SAMPLE_DT_S during the motion, for the probe,
+    D-27; None = not sampled), stop_at (function (i, waypoint) -> bool, same indices as on_waypoint, called when the
+    hand is due at each waypoint; True = stop the motion there: the hand holds its command, the fingers keep that
+    waypoint's opening.  The probe decides while the push or pull keeps going, D-27).
+    Returns: the PhaseResult (tracking error at the last waypoint reached, joint margin, stopped_at).
     """
     cfg = world.cfg
     wps = _resolve(cfg, waypoints)
@@ -74,15 +80,22 @@ def run_waypoints(world, waypoints, speed: float, label: str = "", on_waypoint=N
     v_traj, f_traj = timed_trajectories(wps, X_start, world.player.last_opening, speed)
     world.start_cartesian(v_traj, f_traj, q0)
     duration = v_traj.end_time() + cfg.HOLD_AFTER_MOTION_S
-    if on_waypoint is None:
-        world.advance_logged(duration)
+    if on_waypoint is None and stop_at is None:
+        world.advance_logged(duration, force_trace)
     else:
         t0 = world.time()
         times = waypoint_times([start] + wps + [wps[-1]._replace(seconds=None)], speed)  # as timed_trajectories
         for i, w in enumerate(wps):
-            world.advance_logged(max(t0 + times[i + 1] - world.time(), 0.0))
-            on_waypoint(first_index + i, w)
-        world.advance_logged(max(t0 + duration - world.time(), 0.0))
+            world.advance_logged(max(t0 + times[i + 1] - world.time(), 0.0), force_trace)
+            if on_waypoint is not None:
+                on_waypoint(first_index + i, w)
+            if stop_at is not None and stop_at(first_index + i, w):
+                world.player.stop(w.opening)
+                world.advance_logged(cfg.HOLD_AFTER_MOTION_S, force_trace)
+                res = _check_after(world, label, w.X_RG)
+                res.duration_s, res.stopped_at = world.time() - t0, first_index + i
+                return res
+        world.advance_logged(max(t0 + duration - world.time(), 0.0), force_trace)
     world.player.stop(wps[-1].opening)
     res = _check_after(world, label, wps[-1].X_RG)
     res.duration_s = duration

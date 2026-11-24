@@ -4,7 +4,10 @@ One trial = one persistent simulator.  Turn loop:
     1. read the true poses into the tower state
     2. candidates = legal pulls (tower rule) that the extraction method can physically take
     3. the strategy picks one (the FIRST pick of every trial is random, whatever the strategy: course rule)
-    4. the mover carries out the turn (real steps, or the fake teleport)
+    4. the mover carries out the turn (real steps, or the fake teleport).  With PROBE_ENABLED the mover probes the
+       block first (jenga/probe.py, D-27); a block that resists is dropped from this turn's candidates, the tower
+       is checked for collapse, and step 3 runs again, up to PROBE_MAX_PER_TURN times; then the block that resisted
+       least is taken without a probe.  Every probe is a row in probes.csv
     5. EVALUATION: classify what happened to the block (true poses), run the collapse detector
     6. log a CSV row; end the trial on collapse, too many failures in a row, or MAX_TURNS
 
@@ -22,7 +25,7 @@ from pathlib import Path
 
 import numpy as np
 
-from jenga import clearance, diaglog, geometry as geo, methods, strategies
+from jenga import clearance, diaglog, geometry as geo, methods, probe, strategies
 from jenga.errors import MotionFailed
 from jenga.evaluation import collapse, outcomes
 from jenga.tower import TowerState
@@ -31,12 +34,16 @@ TURN_COLUMNS = [
     "trial", "seed", "strategy", "extraction_method", "mover", "friction_mode", "n_layers_start", "block_scale",
     "contact_model", "turn", "block_id", "layer", "slot", "target_layer", "target_slot", "station_pull",
     "station_place", "outcome", "collapse", "collapse_reason", "mover_error", "arm_collisions_unchecked",
-    "sim_seconds", "wall_seconds", "place_across_mm", "place_along_mm", "place_height_mm",
+    "sim_seconds", "wall_seconds", "place_across_mm", "place_along_mm", "place_height_mm", "probes_rejected",
 ]
 TRIAL_COLUMNS = [
     "trial", "seed", "strategy", "extraction_method", "mover", "friction_mode", "n_layers_start", "block_scale",
     "contact_model", "turns_attempted", "blocks_replaced", "collapsed", "end_reason", "collapse_reason",
     "first_block", "arm_collisions_unchecked", "sim_seconds", "wall_seconds", "replay_file",
+]
+PROBE_COLUMNS = [
+    "trial", "turn", "block_id", "layer", "slot", "step", "station", "resistance_n", "samples", "accepted",
+    "max_force_n",
 ]
 
 
@@ -121,36 +128,60 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
             end_reason = "no_placement_slot"
             break
 
-        if turn == 0:
-            block = int(first_pick_rng.choice(np.array(candidates)))  # course rule: first block is random
-            if cfg.DIAG_FIRST_BLOCK is not None:  # development only (R-03); drawn above anyway so the stream is unchanged
-                if cfg.DIAG_FIRST_BLOCK not in candidates:
-                    raise ValueError(f"DIAG_FIRST_BLOCK {cfg.DIAG_FIRST_BLOCK} is not a legal pull: {candidates}")
-                block = int(cfg.DIAG_FIRST_BLOCK)
-                log(f"[dev] first block forced to {block} (DIAG_FIRST_BLOCK): not a random pick, never for results")
-            first_block = block
-        else:
-            block = int(select(tower, candidates, cfg, strategy_rng))
-        if block not in candidates:
-            raise ValueError(f"strategy {strategy!r} returned block {block}, which is not in the candidates {candidates}")
-
         target = slots[0]
-        rec = tower.blocks[block]
-        layer, slot = rec.layer, rec.slot
-        before = world.block_poses()
         wall0, sim0 = time.time(), world.time()
-        mover_error, info = "", None
-        try:
-            info = mover.do_turn(world, tower, block, target, cfg)
-        except MotionFailed as e:  # a motion could not be done: logged as a failed turn
-            mover_error = str(e)
-        dlog = getattr(mover, "last_diag", None)  # development log (DIAG_LOG_LEVEL > 0), written even after a failure
-        if dlog is not None:
-            ids = dict(trial=trial, turn=turn, block_id=block)
-            for r in dlog.rows:
-                _append_csv(out_dir / "steps.csv", list(ids) + dlog.columns, dict(ids, **r))
-            for r in dlog.block_rows:
-                _append_csv(out_dir / "step_blocks.csv", list(ids) + diaglog.BLOCK_COLUMNS, dict(ids, **r))
+        pool, rejected = list(candidates), {}  # blocks still to try this turn; probed blocks that resisted -> N
+        while True:
+            probing = cfg.PROBE_ENABLED and len(rejected) < cfg.PROBE_MAX_PER_TURN and bool(pool)
+            # out of probes or blocks: the one that resisted least, without a probe (None: nothing was rejected)
+            block = probe.fallback(rejected) if cfg.PROBE_ENABLED and not probing else None
+            if block is not None:
+                pass
+            elif turn == 0:
+                block = int(first_pick_rng.choice(np.array(pool)))  # course rule: first block is random (redrawn if rejected)
+                if cfg.DIAG_FIRST_BLOCK is not None and not rejected:  # development only (R-03); drawn above anyway so the stream is unchanged
+                    if cfg.DIAG_FIRST_BLOCK not in candidates:
+                        raise ValueError(f"DIAG_FIRST_BLOCK {cfg.DIAG_FIRST_BLOCK} is not a legal pull: {candidates}")
+                    block = int(cfg.DIAG_FIRST_BLOCK)
+                    log(f"[dev] first block forced to {block} (DIAG_FIRST_BLOCK): not a random pick, never for results")
+            else:
+                block = int(select(tower, pool, cfg, strategy_rng))
+                if block not in pool:
+                    raise ValueError(f"strategy {strategy!r} returned block {block}, which is not in the candidates {pool}")
+            if turn == 0:
+                first_block = block
+
+            rec = tower.blocks[block]
+            layer, slot = rec.layer, rec.slot
+            before = world.block_poses()
+            mover_error, info, was_rejected = "", None, False
+            try:
+                info = mover.do_turn(world, tower, block, target, cfg, **({"probe": probing} if cfg.PROBE_ENABLED else {}))
+            except probe.ProbeRejected as e:  # the hand let go and backed off; the block keeps its slot
+                rejected[block], was_rejected = e.resistance_n, True
+                pool.remove(block)
+                mover_error = str(e)
+            except MotionFailed as e:  # a motion could not be done: logged as a failed turn
+                mover_error = str(e)
+            dlog = getattr(mover, "last_diag", None)  # development log (DIAG_LOG_LEVEL > 0), written even after a failure
+            if dlog is not None:
+                ids = dict(trial=trial, turn=turn, block_id=block)
+                for r in dlog.rows:
+                    _append_csv(out_dir / "steps.csv", list(ids) + dlog.columns, dict(ids, **r))
+                for r in dlog.block_rows:
+                    _append_csv(out_dir / "step_blocks.csv", list(ids) + diaglog.BLOCK_COLUMNS, dict(ids, **r))
+            p = getattr(mover, "last_probe", None)
+            if p is not None:
+                _append_csv(out_dir / "probes.csv", PROBE_COLUMNS,
+                            dict(p, trial=trial, turn=turn, max_force_n=probe.max_force(cfg, p.get("step"))))
+            if not was_rejected:
+                break
+            log(f"   [probe] block {block} (layer {layer}, slot {slot}) resisted {rejected[block]:.2f} N: backed off")
+            after = world.block_poses()
+            tower.update_poses(after)
+            if detect(collapse.Truth(before, after, tower, block), cfg).stop:
+                break  # the probe itself knocked the tower: the turn is logged below (failed_pull -> collapse)
+
         after = world.block_poses()
         others = max(float(np.linalg.norm(after[b][:3, 3] - before[b][:3, 3])) for b in before if b != block)
         X_slot, place_err, (p_across, p_along, p_height) = place_error(tower, target, after, block)
@@ -175,7 +206,7 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
                    station_place=getattr(info, "station_place", ""), outcome=outcome, collapse=verdict.stop,
                    collapse_reason=verdict.reason, mover_error=mover_error, sim_seconds=round(world.time() - sim0, 2),
                    place_across_mm=round(p_across * 1000, 2), place_along_mm=round(p_along * 1000, 2),
-                   place_height_mm=round(p_height * 1000, 2),
+                   place_height_mm=round(p_height * 1000, 2), probes_rejected=len(rejected),
                    wall_seconds=round(time.time() - wall0, 1))
         _append_csv(out_dir / "turns.csv", TURN_COLUMNS, row)
         log(f"[trial {trial} turn {turn}] block {block} (layer {layer}, slot {slot}) -> {outcome}"

@@ -18,6 +18,8 @@ Facts (see DECISIONS.md for sources)
   * Probing with the force strategy needs motions: how a strategy commands them is open (the executor
     plays fixed waypoint lists, so it cannot stop the instant a force threshold is crossed; if the force
     strategy needs that, a stop condition would be added to jenga/executor.py without changing the steps).
+  * The probe (jenga/probe.py, D-27) samples the wrist force during one short move (executor.run_waypoints
+    force_trace) and tares it just before, so the hand's weight cancels; it runs a fixed 2 mm move, no stop condition.
 """
 
 import numpy as np

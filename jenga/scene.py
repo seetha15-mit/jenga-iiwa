@@ -463,15 +463,20 @@ class Sim:
     def set_base_target(self, x, y, yaw) -> None:
         self.base_cmd.set(yaw)  # the turntable only turns; x and y follow from the yaw
 
-    def advance_logged(self, seconds: float) -> None:
-        """Advance, sampling the wrist force every SAMPLE_DT_S when config.ENABLE_WRIST_FORCE_LOG is on."""
-        if not self.cfg.ENABLE_WRIST_FORCE_LOG:
+    def advance_logged(self, seconds: float, trace=None) -> None:
+        """Advance, sampling the wrist force every SAMPLE_DT_S when config.ENABLE_WRIST_FORCE_LOG is on (into the
+        trial's force log) or when `trace` is a list (each raw reading appended to it: the probe, D-27)."""
+        if not self.cfg.ENABLE_WRIST_FORCE_LOG and trace is None:
             self.advance(seconds)
             return
         end = self.time() + seconds
         while self.time() < end - 1e-9:
             self.simulator.AdvanceTo(min(self.time() + self.cfg.SAMPLE_DT_S, end))
-            self.force_log.append([self.time(), *self.wrist_force_raw()])
+            F = self.wrist_force_raw()
+            if self.cfg.ENABLE_WRIST_FORCE_LOG:
+                self.force_log.append([self.time(), *F])
+            if trace is not None:
+                trace.append(F)
 
     # ------------------------------------------------------------------ outputs
     def save_replay(self, path) -> bool:

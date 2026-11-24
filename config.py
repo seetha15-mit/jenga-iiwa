@@ -157,6 +157,14 @@ DIAG_FIRST_BLOCK = None  # [user] development only: force the first pick to this
 ENABLE_WRIST_FORCE_LOG = False  # [user] log the raw wrist force during motions
 ENABLE_CAMERAS = False  # [user] cameras are not set up; see jenga/sensing.py notes
 
+# ------------------------------------------------------------------ probe before taking a block (jenga/probe.py, D-27)
+PROBE_ENABLED = False  # [user] nudge each block before the push or pull and back off if it resists; off = turns exactly as before
+PROBE_DIST_M = 0.002  # [estimate] how far the probe moves the hand (push: in; end-pinch: out); a rejected block is left up to this far out of place
+PROBE_SECONDS = 1.0  # [estimate] time for the probe move (2 mm/s, slower than PULL_INSIDE_SPEED_MS)
+PROBE_MAX_PULL_N = None  # [user] end-pinch pull: reject a block whose resistance (largest change in wrist force from the tare) is above this, in N; None = measure only, never reject. Not chosen yet: set it from probes.csv
+PROBE_MAX_PUSH_N = None  # [user] the same for a push (fingertips, no grip: a different contact from a gripped pull, so its own threshold; trial 0 read push 3.2 N, pulls 3.0-4.1 N, measured, one run)
+PROBE_MAX_PER_TURN = 3  # [user] rejections allowed per turn; then (or when no candidate is left) the least-resisting probed block is taken without a probe
+
 # ------------------------------------------------------------------ run_checks.py
 STATIC_CHECK_S = 3.0  # [measured] the prototype used 3 s of rest for the stable-tower check
 STATIC_MAX_MOVE_M = 0.002  # [estimate] a block moving more than this during the check fails it

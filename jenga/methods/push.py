@@ -98,6 +98,27 @@ def plan_push(X_RB, cfg):
     return wayplist
 
 
+PUSH_AT_BLOCK = 2  # plan_push's first PUSH_AT_BLOCK waypoints end with the fingertips on the end face; keep in step with plan_push
+
+
+def plan_probe(X_RB, cfg):
+    """plan_push split for the probe (D-27, jenga/probe.py): fingertips to the end face, push PROBE_DIST_M in slowly,
+    then either finish plan_push or back out.  Written with Claude; the push itself is plan_push's, unchanged.
+
+    Inputs: X_RB, cfg as plan_push.  Returns: probe.ProbePlan(reach, probe, go_on, back_off).
+    reach = plan_push up to the end face; probe = the same pose moved PROBE_DIST_M along G y (plan_push's own push
+    direction) in PROBE_SECONDS; go_on = the rest of plan_push (the push leg keeps its time, so it is slightly
+    slower); back_off = plan_push's own back-out after the push (slow until the fingertips are outside, then
+    retreat and rise)."""
+    from pydrake.all import RigidTransform
+    from jenga.probe import ProbePlan
+    wps = plan_push(X_RB, cfg)
+    reach, go_on = wps[:PUSH_AT_BLOCK], wps[PUSH_AT_BLOCK:]
+    at = reach[-1]
+    probe = [Waypoint(at.X_RG @ RigidTransform([0, cfg.PROBE_DIST_M, 0]), at.opening, cfg.PROBE_SECONDS)]
+    return ProbePlan(reach, probe, go_on, wps[PUSH_AT_BLOCK + 1:])
+
+
 def plan_pull(X_RB, cfg):
     """Waypoints that grasp the end sticking out of the far side and pull the block clear of the tower.
     X_RB: the block's pose AFTER the push, in the robot frame at the pull station."""
