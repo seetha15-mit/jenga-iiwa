@@ -23,6 +23,7 @@ Facts (see DECISIONS.md for sources)
 
 import numpy as np
 from jenga import geometry as geo
+from scipy.spatial import cKDTree
 
 def read_wrist_force_raw(world) -> np.ndarray:
     """[Fx, Fy, Fz, Tx, Ty, Tz] in the gripper frame, raw (includes the hand's weight, no noise)."""
@@ -51,13 +52,14 @@ def block_model_points(cfg, spacing_m: float = 0.002) -> np.ndarray:
     XZ_x, XZ_z = np.meshgrid(xpoints,zpoints)
     YZ_y,YZ_z = np.meshgrid(ypoints,zpoints)
     top = np.stack([XY_x.ravel(),XY_y.ravel(),np.full(XY_x.size,H)],axis=1)
+    #no camera sees the bottom, but ICP matches scene points to model points, so unseen model points rarely get used and keeping them is harmless.
     bottom = np.stack([XY_x.ravel(),XY_y.ravel(),np.full(XY_x.size,0.0)],axis=1)
     leftside = np.stack([XZ_x.ravel(),np.full(XZ_x.size,-W/2),XZ_z.ravel()],axis=1)
     rightside = np.stack([XZ_x.ravel(),np.full(XZ_x.size,W/2),XZ_z.ravel()],axis=1)
     leftend = np.stack([np.full(YZ_y.size,-L/2),YZ_y.ravel(), YZ_z.ravel()],axis=1)
     rightend = np.stack([np.full(YZ_y.size,L/2),YZ_y.ravel(), YZ_z.ravel()],axis=1)
     return np.vstack([top,bottom,leftside,rightside,leftend,rightend])
-    # ---- END CODE TO BE WRITTEN ----
+
 
 
 def segment_blocks(points_W: np.ndarray, rgb: np.ndarray, cfg) -> dict:
@@ -72,7 +74,7 @@ def segment_blocks(points_W: np.ndarray, rgb: np.ndarray, cfg) -> dict:
     # ---- END CODE TO BE WRITTEN ----
 
 
-def icp_pose(scene_points: np.ndarray, model_points: np.ndarray, X_init: np.ndarray, iterations: int = 30) -> np.ndarray:
+def icp_pose(scene_points: np.ndarray, model_points: np.ndarray, X_init: np.ndarray, iterations: int = 100) -> np.ndarray:
     """ICP, as in the class's geometric pose estimation: find the 4x4 world pose X of the block such that the model
     points moved by X lie on the scene points.  Start at X_init (for example the block's last known pose).
     Each iteration: (1) for each scene point, the nearest model point under the current X (scipy.spatial.cKDTree);
@@ -80,8 +82,29 @@ def icp_pose(scene_points: np.ndarray, model_points: np.ndarray, X_init: np.ndar
     (3) update X.  Things to decide: point-to-point or point-to-plane; when to stop; whether to allow only a turn
     about vertical (blocks lie flat) or a full 3-D rotation; how far a match may be before it is ignored."""
     # ---- BEGIN CODE TO BE WRITTEN ----
-    raise NotImplementedError("icp_pose: CODE TO BE WRITTEN")
+    #bring scene into current block frame
+    R_WB = X_init[:3,:3]
+    p_WB = X_init[:3,3]
+    tree = cKDTree(model_points)
+    idx_prev = None
+    for i in range(iterations):
+        scene_B = (scene_points-p_WB)@R_WB # each row: R^T (p - t)
+        dist, idx = tree.query(scene_B)
+        if np.array_equal(idx, idx_prev):
+          break
+        matched = model_points[idx]
+        SVDinpmat = (scene_points-scene_points.mean(axis=0)).transpose()@ (matched-matched.mean(axis=0))
+        svdU, svdS, svdVt = np.linalg.svd(SVDinpmat)
+        Diagsignflipper = np.diag([1.0, 1.0, np.linalg.det(svdU @ svdVt)])
+        R_WB = svdU @ Diagsignflipper @ svdVt
+        p_WB = scene_points.mean(axis=0)-R_WB@matched.mean(axis=0)
+        idx_prev = idx
+    new_X = np.eye(4)
+    new_X[:3, :3] = R_WB
+    new_X[:3, 3] = p_WB
+    return new_X
     # ---- END CODE TO BE WRITTEN ----
+
 
 
 def estimate_block_poses(images: dict, cfg, guesses: dict) -> dict:
