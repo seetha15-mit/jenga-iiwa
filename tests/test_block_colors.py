@@ -13,8 +13,29 @@ def touching(a, b):
 
 
 class TestBlockColors(unittest.TestCase):
-    def test_colored_is_the_default(self):
-        self.assertEqual(make_cfg().BLOCK_COLORS, "colored")
+    def test_unique_is_the_default(self):
+        self.assertEqual(make_cfg().BLOCK_COLORS, "unique")
+
+    def test_unique_every_block_differs(self):
+        for n_layers in (3, 6, 12):
+            cfg = make_cfg(BLOCK_COLORS="unique", N_LAYERS_START=n_layers)
+            self.assertEqual(len({geo.block_color(cfg, b) for b in range(3 * n_layers)}), 3 * n_layers)
+
+    def test_unique_touching_blocks_are_two_hue_steps_apart(self):
+        # 18 blocks: hues 20 deg apart; touching blocks get at least 2 steps (40 deg), so an edge pixel blending
+        # two touching blocks is not just halfway to the next hue
+        self.assertEqual(geo.unique_hue_step(18), 5)
+        n, k = 18, geo.unique_hue_step(18)
+        for a in range(n):
+            for b in range(a + 1, n):
+                if touching(a, b):
+                    steps = (a - b) * k % n
+                    self.assertGreaterEqual(min(steps, n - steps), 2, (a, b))
+
+    def test_unique_hue_step_shares_no_factor(self):
+        import math
+        for n in (3, 9, 18, 36):
+            self.assertEqual(math.gcd(geo.unique_hue_step(n), n), 1, n)
 
     def test_colored_touching_blocks_differ_for_any_height(self):
         cfg = make_cfg(BLOCK_COLORS="colored")

@@ -29,7 +29,7 @@ COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 # ------------------------------------------------------------------ blocks
 BLOCK_REAL_M = (0.075, 0.025, 0.015)  # [course] a real Jenga block: length, width, height
 BLOCK_SCALE = 1.45  # [user] ONE scale for all three dimensions (decided from the gripper numbers)
-BLOCK_COLORS = "colored"  # [user] "colored" (3 colours per layer by slot, another 3 on odd layers; for perception) or "wood"
+BLOCK_COLORS = "unique"  # [user] "unique" (every block its own hue, touching blocks at least 40 deg apart; for perception, geometry.block_color), "colored" (3 colours per layer by slot, another 3 on odd layers) or "wood"
 BLOCK_GAP_M = 0.0005  # [estimate] gap between neighbouring blocks, and between layers when the tower is built (prototype value, not verified); places aim at the measured top instead (D-25)
 BLOCK_DENSITY = 700.0  # [estimate] kg/m^3; gives about 0.06 kg per block at this scale
 FRICTION_MODE = "global"  # [user] "global" (all equal) or "random" (varied, hidden from strategies)
@@ -156,7 +156,13 @@ DIAG_FIRST_BLOCK = None  # [user] development only: force the first pick to this
 
 # ------------------------------------------------------------------ sensing (notes only; the team decides)
 ENABLE_WRIST_FORCE_LOG = False  # [user] log the raw wrist force during motions
-ENABLE_CAMERAS = False  # [user] cameras are not set up; see jenga/sensing.py notes
+ENABLE_CAMERAS = False  # [user] add the two RGB-D cameras below (scene.Sim.camera_images; rendered only when asked)
+CAMERA_WIDTH_PX = 1280  # [user] image width; 0.7 mm per pixel at the tower (~0.8 m away, derived), below the 0.875 mm finger margin; near a RealSense D415 (1280x720 depth)
+CAMERA_HEIGHT_PX = 960  # [user] image height; rendering both cameras ~45 ms per call on the Mac (measured; 640x480 was 20-90 ms)
+CAMERA_FOV_Y_DEG = 45.0  # [estimate] vertical field of view
+CAMERA_BASE_EYE_M = (0.30, 0.35, 0.55)  # [estimate] "base" camera position in the robot frame R (x toward the tower, y left, z up): beside the arm, so the arm blocks less of the view; it turns with the robot
+CAMERA_TOP_HEIGHT_M = 1.0  # [estimate] "top" camera height above the table, straight above the tower centre, looking down
+CAMERA_AIM_Z_M = 0.20  # [estimate] both cameras look at the tower's axis at this height (platform 0.10 m + 6 layers about 0.13 m)
 
 # ------------------------------------------------------------------ run_checks.py
 STATIC_CHECK_S = 3.0  # [measured] the prototype used 3 s of rest for the stable-tower check
