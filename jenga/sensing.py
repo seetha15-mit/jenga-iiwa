@@ -22,7 +22,7 @@ Facts (see DECISIONS.md for sources)
 """
 
 import numpy as np
-
+from jenga import geometry as geo
 
 def read_wrist_force_raw(world) -> np.ndarray:
     """[Fx, Fy, Fz, Tx, Ty, Tz] in the gripper frame, raw (includes the hand's weight, no noise)."""
@@ -39,7 +39,24 @@ def block_model_points(cfg, spacing_m: float = 0.002) -> np.ndarray:
     the BOTTOM face, x = long axis; geometry.block_dims gives L, W, H).  The model that ICP matches the camera
     points to.  Things to decide: the spacing; whether to keep the bottom face (a camera never sees it)."""
     # ---- BEGIN CODE TO BE WRITTEN ----
-    raise NotImplementedError("block_model_points: CODE TO BE WRITTEN")
+    L,W,H = geo.block_dims(cfg)
+    nx = int(np.ceil(L / spacing_m)) + 1 
+    ny = int(np.ceil(W / spacing_m)) + 1 
+    nz = int(np.ceil(H / spacing_m)) + 1 
+    xpoints = np.linspace(-L/2,L/2,nx)
+    ypoints = np.linspace(-W/2,W/2,ny)
+    zpoints = np.linspace(0,H,nz)
+
+    XY_x, XY_y = np.meshgrid(xpoints,ypoints)
+    XZ_x, XZ_z = np.meshgrid(xpoints,zpoints)
+    YZ_y,YZ_z = np.meshgrid(ypoints,zpoints)
+    top = np.stack([XY_x.ravel(),XY_y.ravel(),np.full(XY_x.size,H)],axis=1)
+    bottom = np.stack([XY_x.ravel(),XY_y.ravel(),np.full(XY_x.size,0.0)],axis=1)
+    leftside = np.stack([XZ_x.ravel(),np.full(XZ_x.size,-W/2),XZ_z.ravel()],axis=1)
+    rightside = np.stack([XZ_x.ravel(),np.full(XZ_x.size,W/2),XZ_z.ravel()],axis=1)
+    leftend = np.stack([np.full(YZ_y.size,-L/2),YZ_y.ravel(), YZ_z.ravel()],axis=1)
+    rightend = np.stack([np.full(YZ_y.size,L/2),YZ_y.ravel(), YZ_z.ravel()],axis=1)
+    return np.vstack([top,bottom,leftside,rightside,leftend,rightend])
     # ---- END CODE TO BE WRITTEN ----
 
 
