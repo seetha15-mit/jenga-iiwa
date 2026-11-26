@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from jenga import clearance, diaglog, geometry as geo, methods, strategies
+from jenga import clearance, diaglog, geometry as geo, methods, perceive, strategies
 from jenga.errors import MotionFailed
 from jenga.evaluation import collapse, outcomes
 from jenga.tower import TowerState
@@ -32,12 +32,23 @@ TURN_COLUMNS = [
     "contact_model", "turn", "block_id", "layer", "slot", "target_layer", "target_slot", "station_pull",
     "station_place", "outcome", "collapse", "collapse_reason", "mover_error", "arm_collisions_unchecked",
     "sim_seconds", "wall_seconds", "place_across_mm", "place_along_mm", "place_height_mm",
+    "perception_unseen", "perception_max_height_mm", "perception_max_pos_mm",
 ]
 TRIAL_COLUMNS = [
     "trial", "seed", "strategy", "extraction_method", "mover", "friction_mode", "n_layers_start", "block_scale",
     "contact_model", "turns_attempted", "blocks_replaced", "collapsed", "end_reason", "collapse_reason",
     "first_block", "arm_collisions_unchecked", "sim_seconds", "wall_seconds", "replay_file",
 ]
+
+
+def perception_error(perceived: dict, truth: dict, unseen) -> dict:
+    """Evaluation only: how far perception's tower poses were from the truth this turn (turns.csv columns).
+    Height is the finger-height-critical one (0.875 mm margin, D-06); blocks nobody saw are counted, not scored."""
+    seen = [b for b in perceived if b not in unseen]
+    dz = [abs(perceived[b][2, 3] - truth[b][2, 3]) for b in seen]
+    dp = [np.linalg.norm(perceived[b][:3, 3] - truth[b][:3, 3]) for b in seen]
+    return dict(perception_unseen=len(unseen), perception_max_height_mm=round(max(dz, default=0.0) * 1000, 2),
+                perception_max_pos_mm=round(max(dp, default=0.0) * 1000, 2))
 
 
 def make_sim_world(cfg, tower, friction, record_replay):
@@ -109,8 +120,15 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
     replaced, failures, first_block = 0, 0, ""
     end_reason, collapse_reason, collapsed, turns = "max_turns", "", False, 0
 
+    seen = {}  # perception: what observe() saw last turn (its starting guesses for this turn)
     for turn in range(cfg.MAX_TURNS):
-        tower.update_poses(world.block_poses())
+        perception_cols = {}
+        if cfg.PERCEPTION:  # the tower bookkeeping from the cameras (perceive.py); scored against truth for the log
+            poses, seen, unseen = perceive.observe(world, tower, cfg, seen)
+            tower.update_poses(poses)
+            perception_cols = perception_error(poses, world.block_poses(), unseen)
+        else:
+            tower.update_poses(world.block_poses())
         legal = tower.pull_candidates()
         candidates = [b for b in legal if method.can_pull(tower, b, cfg)]
         slots = [s for s in tower.placement_slots() if method.can_place(tower, s[0], s[1], cfg)]
@@ -160,8 +178,10 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
         turns += 1
 
         outcome = outcomes.classify_turn(before[block], after[block], X_slot, cfg)  # slot at the measured height
-        # the tower bookkeeping follows what really happened
-        tower.update_poses(after)
+        # the tower bookkeeping follows what really happened (with perception on, its poses come from the cameras at
+        # the next turn's start instead: copying truth in here would start the next ICP at the right answer)
+        if not cfg.PERCEPTION:
+            tower.update_poses(after)
         if outcome == "replaced":
             tower.place(block, *target)
         elif outcome == "dropped":
@@ -176,7 +196,7 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
                    collapse_reason=verdict.reason, mover_error=mover_error, sim_seconds=round(world.time() - sim0, 2),
                    place_across_mm=round(p_across * 1000, 2), place_along_mm=round(p_along * 1000, 2),
                    place_height_mm=round(p_height * 1000, 2),
-                   wall_seconds=round(time.time() - wall0, 1))
+                   wall_seconds=round(time.time() - wall0, 1), **perception_cols)
         _append_csv(out_dir / "turns.csv", TURN_COLUMNS, row)
         log(f"[trial {trial} turn {turn}] block {block} (layer {layer}, slot {slot}) -> {outcome}"
             + (f"  ({verdict.reason})" if verdict.stop else "") + (f"  [{mover_error}]" if mover_error else ""))

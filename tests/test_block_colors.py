@@ -13,8 +13,15 @@ def touching(a, b):
 
 
 class TestBlockColors(unittest.TestCase):
-    def test_unique_is_the_default(self):
-        self.assertEqual(make_cfg().BLOCK_COLORS, "unique")
+    def test_auto_is_the_default(self):
+        self.assertEqual(make_cfg().BLOCK_COLORS, "auto")
+
+    def test_auto_follows_the_perception_switch(self):
+        on = make_cfg(BLOCK_COLORS="auto", PERCEPTION=True)
+        off = make_cfg(BLOCK_COLORS="auto", PERCEPTION=False)
+        for b in range(18):
+            self.assertEqual(geo.block_color(on, b), geo.block_color(make_cfg(BLOCK_COLORS="unique"), b))
+            self.assertEqual(geo.block_color(off, b), geo.block_color(make_cfg(BLOCK_COLORS="wood"), b))
 
     def test_unique_every_block_differs(self):
         for n_layers in (3, 6, 12):

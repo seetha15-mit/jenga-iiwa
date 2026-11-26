@@ -35,11 +35,14 @@ def read_wrist_force_raw(world) -> np.ndarray:
 # by ICP against a box model.  scratch/check_perception.py compares the result with the simulator's truth.
 # Inputs come only from scene.Sim.camera_images(): rgb, depth, K, X_WC.  Never the label image (it is truth).
 
-def block_model_points(cfg, spacing_m: float = 0.002) -> np.ndarray:
+def block_model_points(cfg, spacing_m: float = 0.0005) -> np.ndarray:
     """(M, 3) points spread over the SURFACE of one block, in the block's body frame B (origin at the centre of
     the BOTTOM face, x = long axis; geometry.block_dims gives L, W, H).  The model that ICP matches the camera
     points to.  Things to decide: the spacing; whether to keep the bottom face (a camera never sees it)."""
     # ---- BEGIN CODE TO BE WRITTEN ----
+    # spacing 0.5 mm [measured]: at 2 mm, ICP cannot follow height changes smaller than ~one grid step on blocks that
+    # show only end faces, so perceived heights drifted 0.45 -> 1.04 mm over 3 turns; at 0.5 mm 0.19 -> 0.58 mm
+    # (scratch/perception_drift.py).  Costs ~2x the ICP time (about 2-3 s per perception call).
     L,W,H = geo.block_dims(cfg)
     nx = int(np.ceil(L / spacing_m)) + 1 
     ny = int(np.ceil(W / spacing_m)) + 1 

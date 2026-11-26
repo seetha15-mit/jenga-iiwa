@@ -29,7 +29,7 @@ COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 # ------------------------------------------------------------------ blocks
 BLOCK_REAL_M = (0.075, 0.025, 0.015)  # [course] a real Jenga block: length, width, height
 BLOCK_SCALE = 1.45  # [user] ONE scale for all three dimensions (decided from the gripper numbers)
-BLOCK_COLORS = "unique"  # [user] "unique" (every block its own hue, touching blocks at least 40 deg apart; for perception, geometry.block_color), "colored" (3 colours per layer by slot, another 3 on odd layers) or "wood"
+BLOCK_COLORS = "auto"  # [user] "auto": "unique" when PERCEPTION is on, "wood" when off.  Or force one: "unique" (every block its own hue, touching blocks at least 40 deg apart; geometry.block_color), "colored" (3 colours per layer by slot, another 3 on odd layers) or "wood"
 BLOCK_GAP_M = 0.0005  # [estimate] gap between neighbouring blocks, and between layers when the tower is built (prototype value, not verified); places aim at the measured top instead (D-25)
 BLOCK_DENSITY = 700.0  # [estimate] kg/m^3; gives about 0.06 kg per block at this scale
 FRICTION_MODE = "global"  # [user] "global" (all equal) or "random" (varied, hidden from strategies)
@@ -156,6 +156,7 @@ DIAG_FIRST_BLOCK = None  # [user] development only: force the first pick to this
 
 # ------------------------------------------------------------------ sensing (notes only; the team decides)
 ENABLE_WRIST_FORCE_LOG = False  # [user] log the raw wrist force during motions
+PERCEPTION = False  # [user] the tower bookkeeping, pull targets and place heights come from the cameras (jenga/perceive.py, sensing.estimate_block_poses) instead of the simulator's truth; turns the cameras on.  Mid-turn reads (push method steps, block in the hand) and the swing check still use truth
 ENABLE_CAMERAS = False  # [user] add the two RGB-D cameras below (scene.Sim.camera_images; rendered only when asked)
 CAMERA_WIDTH_PX = 1280  # [user] image width; 0.7 mm per pixel at the tower (~0.8 m away, derived), below the 0.875 mm finger margin; near a RealSense D415 (1280x720 depth)
 CAMERA_HEIGHT_PX = 960  # [user] image height; rendering both cameras ~45 ms per call on the Mac (measured; 640x480 was 20-90 ms)

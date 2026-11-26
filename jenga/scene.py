@@ -255,7 +255,7 @@ class Sim:
             MeshcatVisualizer.AddToBuilder(builder, self.scene_graph, self.meshcat)
 
         # ---- cameras (only with ENABLE_CAMERAS); Drake renders an image only when camera_images() asks for it
-        self.cameras = self._add_cameras(builder) if cfg.ENABLE_CAMERAS else {}
+        self.cameras = self._add_cameras(builder) if (cfg.ENABLE_CAMERAS or cfg.PERCEPTION) else {}
 
         self.diagram = builder.Build()
         self.simulator = Simulator(self.diagram)

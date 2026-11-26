@@ -168,14 +168,17 @@ def unique_hue_step(n: int) -> int:
 
 def block_color(cfg, block_id: int) -> tuple:
     """RGB of a block from its STARTING layer and slot (block_id = 3 * layer + slot), for any number of layers.
-    cfg.BLOCK_COLORS: "unique" (every block its own colour, see unique_hue_step), "colored" (see above) or "wood"
-    (two tones by layer).  The colour stays with the block when it is moved, so "colored" differs between touching
+    cfg.BLOCK_COLORS: "auto" ("unique" when cfg.PERCEPTION is on, else "wood"), "unique" (every block its own
+    colour, see unique_hue_step), "colored" (see above) or "wood" (two tones by layer).  The colour stays with the block when it is moved, so "colored" differs between touching
     blocks only in the starting tower; "unique" tells every block apart wherever it ends up."""
     layer, slot = divmod(block_id, 3)
-    if cfg.BLOCK_COLORS == "unique":
+    mode = cfg.BLOCK_COLORS
+    if mode == "auto":  # the colours follow the perception switch: only perception needs them
+        mode = "unique" if getattr(cfg, "PERCEPTION", False) else "wood"
+    if mode == "unique":
         n = 3 * cfg.N_LAYERS_START
         return colorsys.hsv_to_rgb((block_id * unique_hue_step(n)) % n / n, UNIQUE_SATURATION, UNIQUE_VALUE)
-    if cfg.BLOCK_COLORS == "wood":
+    if mode == "wood":
         return WOOD[layer % 2]
     return (COLORED_EVEN if layer % 2 == 0 else COLORED_ODD)[slot]
 

@@ -33,7 +33,7 @@ def release_target(tower, layer, slot, poses, cfg, held=None) -> np.ndarray:
     """The slot's pose with its height set to the MEASURED top of the layer below (mean bottom face of the blocks
     there + one block height), not the built height: the tower is built with a gap between layers and settles, so
     the built height sits above the real top by more each layer (D-25).  poses: block id -> 4x4 world pose
-    (simulator truth, as for the grasp correction; a real robot would need to sense the top).  held: the block in
+    (simulator truth, or the perceived tower with config.PERCEPTION, stage 3).  held: the block in
     the hand, never counted."""
     X = np.array(tower.target_pose(layer, slot), dtype=float)
     below = [b for b in tower.layer_blocks(layer - 1) if b != held] if layer > 0 else []
@@ -151,7 +151,8 @@ class RealMover:
         k_place = method.choose_place_station(tower, layer, slot, cfg, world.station)
         # no tuck before the place: the arm resets before each pull/push (O-5)
         do("roll_to_place", ex.move_base_to_station, world, k_place, tuck=False)
-        X_RT = in_R(release_target(tower, layer, slot, world.block_poses(), cfg, held=block_id))
+        poses = {b: tower.block_pose(b) for b in tower.blocks} if cfg.PERCEPTION else world.block_poses()  # perceived or truth
+        X_RT = in_R(release_target(tower, layer, slot, poses, cfg, held=block_id))
         wps = method.plan_place(X_RT, cfg)
         i = release_index(wps, cfg) if cfg.PLACE_CORRECT_GRASP else None
         if i is not None:  # aim the block, not the hand: it slides in the pads during the roll (D-08)
