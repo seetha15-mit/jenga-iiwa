@@ -106,7 +106,8 @@ def segment_blocks(points_W: np.ndarray, rgb: np.ndarray, cfg, crop=None) -> dic
     # ---- END CODE TO BE WRITTEN ----
 
 
-def icp_pose(scene_points: np.ndarray, model_points: np.ndarray, X_init: np.ndarray, iterations: int = 100) -> np.ndarray:
+def icp_pose(scene_points: np.ndarray, model_points: np.ndarray, X_init: np.ndarray, iterations: int = 100,
+             max_match_m: float = 0.003) -> np.ndarray:
     """ICP, as in the class's geometric pose estimation: find the 4x4 world pose X of the block such that the model
     points moved by X lie on the scene points.  Start at X_init (for example the block's last known pose).
     Each iteration: (1) for each scene point, the nearest model point under the current X (scipy.spatial.cKDTree);
@@ -124,12 +125,18 @@ def icp_pose(scene_points: np.ndarray, model_points: np.ndarray, X_init: np.ndar
         dist, idx = tree.query(scene_B)
         if np.array_equal(idx, idx_prev):
           break
-        matched = model_points[idx]
-        SVDinpmat = (scene_points-scene_points.mean(axis=0)).transpose()@ (matched-matched.mean(axis=0))
+        # outlier rejection (as in the lecture): ignore points farther from their match than max_match_m (3 mm) or
+        # 3x the median match distance, whichever is larger.  Why: blended edge pixels of the layer above can take
+        # this block's hue and pass the 1 cm box; 99 of them pulled block 13 up 8 mm in a real game
+        # (scratch/perception_leak.py).  The median term keeps every point while the start is still far off.
+        keep = dist < max(max_match_m, 3 * np.median(dist))
+        matched = model_points[idx][keep]
+        sp = scene_points[keep]
+        SVDinpmat = (sp-sp.mean(axis=0)).transpose()@ (matched-matched.mean(axis=0))
         svdU, svdS, svdVt = np.linalg.svd(SVDinpmat)
         Diagsignflipper = np.diag([1.0, 1.0, np.linalg.det(svdU @ svdVt)])
         R_WB = svdU @ Diagsignflipper @ svdVt
-        p_WB = scene_points.mean(axis=0)-R_WB@matched.mean(axis=0)
+        p_WB = sp.mean(axis=0)-R_WB@matched.mean(axis=0)
         idx_prev = idx
     new_X = np.eye(4)
     new_X[:3, :3] = R_WB

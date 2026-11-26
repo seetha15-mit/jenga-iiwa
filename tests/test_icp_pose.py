@@ -82,6 +82,18 @@ class TestIcpPose(unittest.TestCase):
         self.assertLess(np.linalg.norm(d), 0.0002)
         self.assertLess(ang, 0.3)
 
+    def test_stray_points_from_the_layer_above_are_ignored(self):
+        # the blended-edge leak: ~15% of the points sit 1-10 mm above the block's top (the layer above's seam)
+        scene = moved(face_points(self.cfg, ["top", "side", "end"]), self.X_true)
+        L, W, H = geo.block_dims(self.cfg)
+        rng = np.random.default_rng(1)
+        n = len(scene) // 6
+        stray = np.c_[(rng.random(n) - .5) * L, (rng.random(n) - .5) * W, H + 0.001 + 0.009 * rng.random(n)]
+        d, ang = self.error(sensing.icp_pose(np.vstack([scene, moved(stray, self.X_true)]), self.model,
+                                             start_off(self.X_true, 0.003, 2)))
+        self.assertLess(abs(d[2]), 0.0003)
+        self.assertLess(np.linalg.norm(d), 0.0005)
+
 
 if __name__ == "__main__":
     unittest.main()
