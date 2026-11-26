@@ -92,9 +92,6 @@ class TestHarnessSwitch(unittest.TestCase):
         self.assertEqual(float(row["perception_max_height_mm"]), 0.3)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class TestMidTurn(unittest.TestCase):
     """Stage 3b: one block where it should be (push, pedestal) and the swing check's obstacles."""
@@ -150,7 +147,56 @@ class TestMidTurn(unittest.TestCase):
         world.cfg = make_cfg(PERCEPTION=False)
         self.assertIs(clearance.swing_poses(world, held=3), truth)            # off: truth, as before
         world.cfg = make_cfg(PERCEPTION=True)
-        poses = clearance.swing_poses(world, held=3)
+        in_hand = geo.make_pose(0.49, 0, 0.3)
+        with mock.patch.object(perceive, "observe_held", return_value=in_hand) as held:
+            poses = clearance.swing_poses(world, held=3)
+        self.assertEqual(held.call_args.args[2], 3)
         np.testing.assert_allclose(poses[1], seen[1])                          # obstacles: perceived
-        np.testing.assert_allclose(poses[3], truth[3])                         # the held block: still truth
+        np.testing.assert_allclose(poses[3], in_hand)                          # the held block: perceived in the hand
         self.assertEqual(set(clearance.swing_poses(world)), {1, 2})            # untracked blocks left out
+
+
+class TestInHand(unittest.TestCase):
+    """Stage 3b: the grasp is remembered when the fingers close; the held block is perceived from it."""
+
+    def setUp(self):
+        self.cfg = make_cfg()
+
+    def wp(self, X, opening):
+        from jenga.waypoint import Waypoint
+        return Waypoint(X, opening)
+
+    def test_grasp_index_is_where_the_fingers_first_close(self):
+        A, B = geo.make_pose(0, 0, 0), geo.make_pose(0.1, 0, 0)
+        plan = [self.wp(A, None), self.wp(B, None), self.wp(B, 0.09), self.wp(B, 0.08), self.wp(A, 0.08)]
+        self.assertEqual(perceive.grasp_index(plan, self.cfg), 2)
+        self.assertIsNone(perceive.grasp_index([self.wp(A, None), self.wp(B, None)], self.cfg))
+
+    def test_record_grasp_keeps_the_block_in_the_hand_frame(self):
+        X_RG = geo.make_pose(0.5, 0.1, 0.2, yaw=0.3)
+        X_RB = geo.make_pose(0.55, 0.12, 0.19, yaw=1.0)
+        world = type("W", (), {})()
+        perceive.record_grasp(world, self.cfg, 7, [self.wp(geo.make_pose(0, 0, 0), None), self.wp(X_RG, 0.09)], X_RB)
+        b, X_GB = world.held_grasp
+        self.assertEqual(b, 7)
+        np.testing.assert_allclose(X_RG @ X_GB, X_RB, atol=1e-12)  # hand at the grasp x grasp = the block
+
+    def test_observe_held_starts_from_the_hand_now(self):
+        X_WR = geo.make_pose(-0.9, 0.0, 0.0)
+        X_RG_now = geo.make_pose(0.6, 0.0, 0.3, yaw=0.2)
+        X_GB = geo.make_pose(0.0, 0.108, 0.01)
+        world = type("W", (), {})()
+        world.held_grasp = (7, X_GB)
+        world.X_WR = lambda: X_WR
+        world.arm_q = lambda: None
+        world.kin = type("K", (), {"gripper_pose": staticmethod(lambda q: X_RG_now)})()
+        with mock.patch.object(perceive, "observe_block", return_value="est") as ob:
+            self.assertEqual(perceive.observe_held(world, self.cfg, 7, "test"), "est")
+        guess = ob.call_args.args[3]
+        np.testing.assert_allclose(guess, X_WR @ X_RG_now @ X_GB)
+        lo, hi = ob.call_args.kwargs["crop"]
+        self.assertTrue(np.all(lo <= guess[:3, 3]) and np.all(guess[:3, 3] <= hi))
+
+
+if __name__ == "__main__":
+    unittest.main()

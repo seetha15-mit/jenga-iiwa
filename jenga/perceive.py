@@ -40,6 +40,7 @@ def observe(world, tower, cfg, last: dict):
     est = sensing.estimate_block_poses(world.camera_images(), cfg, g)
     poses = {b: np.asarray(est.get(b, g[b]), dtype=float) for b in g}
     world.perceived = dict(poses)  # the swing check's obstacles (clearance.swing_poses), updated by observe_block
+    world.held_grasp = None  # a new turn: nothing in the hand yet (record_grasp sets it)
     slot_of = {b: ls for ls, b in tower.slot_map.items()}
     return poses, {b: (slot_of[b], X) for b, X in poses.items()}, sorted(set(g) - set(est))
 
@@ -75,3 +76,37 @@ def observe_block(world, cfg, block_id: int, guess: np.ndarray, crop=None, label
     if getattr(world, "perceived", None) is not None:
         world.perceived[block_id] = X
     return X
+
+
+# ---------------------------------------------------------------- the block in the hand (stage 3b)
+def _mat(X) -> np.ndarray:
+    return np.asarray(X.GetAsMatrix4() if hasattr(X, "GetAsMatrix4") else X, dtype=float)
+
+
+def grasp_index(waypoints, cfg):
+    """Index of the first waypoint whose opening is narrower than the one before: where the fingers close.
+    None if they never close."""
+    widths = [cfg.FINGER_OPEN_COMMAND_M if w.opening is None else w.opening for w in waypoints]
+    return next((i for i in range(1, len(widths)) if widths[i] < widths[i - 1]), None)
+
+
+def record_grasp(world, cfg, block_id: int, waypoints, X_RB) -> None:
+    """Remember where the block sits in the hand when the fingers close: X_GB = inv(X_RG at the closing waypoint)
+    X_RB, both in the robot frame and both from the plan and its target (no truth).  Works for any method's grasp.
+    observe_held starts ICP from it; perception then finds how far the block has slipped since."""
+    i = grasp_index(waypoints, cfg)
+    if i is not None:
+        world.held_grasp = (block_id, np.linalg.inv(_mat(waypoints[i].X_RG)) @ _mat(X_RB))
+
+
+def observe_held(world, cfg, block_id: int, label: str = "") -> np.ndarray:
+    """The block in the hand, from the cameras: ICP from (hand pose now) x (the grasp record_grasp kept), in a box
+    around that guess.  Measured with the existing cameras (scratch/inhand_probe.py): seen at every moment checked,
+    within 0.3 mm at the place."""
+    grasp = getattr(world, "held_grasp", None)
+    if grasp is None or grasp[0] != block_id:
+        print(f"   [perception] {label}: no grasp recorded for block {block_id}; using the simulator's pose")
+        return np.asarray(world.block_poses()[block_id], dtype=float)
+    X_WG = np.asarray(world.X_WR(), float) @ _mat(world.kin.gripper_pose(world.arm_q()))
+    guess = X_WG @ grasp[1]
+    return observe_block(world, cfg, block_id, guess, crop=box_around(guess, cfg), label=label)

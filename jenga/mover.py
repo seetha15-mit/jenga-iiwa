@@ -115,6 +115,15 @@ class RealMover:
                 dlog.step(name, res)
             return res
 
+        def held_pose(label):  # the block in the hand: from the cameras with PERCEPTION (stage 3b), else the truth
+            return perceive.observe_held(world, cfg, block_id, label) if cfg.PERCEPTION else world.block_poses()[block_id]
+
+        def grasp(name, X_WB, plan_fn, label):  # plan a grasp on the block at X_WB, remember it, run it
+            plan = plan_fn(in_R(X_WB), cfg)
+            if cfg.PERCEPTION:  # the in-hand guess for observe_held
+                perceive.record_grasp(world, cfg, block_id, plan, in_R(X_WB))
+            do(name, ex.run_plan, world, plan, cfg.WAYPOINT_SPEED_MS, label=label)
+
         if hasattr(method, "plan_push"):
             # ---- push (push method): from one end, the block slides part way out the far side
             k_push = method.choose_station(tower, block_id, cfg, world.station)
@@ -130,18 +139,19 @@ class RealMover:
                                                   label="after the push")
             else:
                 X_pushed = world.block_poses()[block_id]
-            do("pull", ex.run_plan, world, method.plan_pull(in_R(X_pushed), cfg), cfg.WAYPOINT_SPEED_MS, label="pull")
+            grasp("pull", X_pushed, method.plan_pull, "pull")
             # ---- set it on a pedestal, then regrab it from where it actually landed (D-22); each is its own plan,
             # so each starts with a joint move (this clears the hand's drift before the regrab grasp)
             # swing to above the post; then read where the block really sits in the hand (it slides 6-15 mm down
             # the fingers during the swing) and shift the set-down by that, as for the place (D-08); then go down
-            ped = method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg)
+            ped = method.plan_ped_place(in_R(held_pose("before the pedestal swing")), cfg)
             do("pedestal", ex.run_plan, world, ped[:1], cfg.WAYPOINT_SPEED_MS, label="pedestal", held=block_id)
             if cfg.PEDESTAL_CORRECT_GRASP:
+                X_held = held_pose("above the pedestal")
                 X_T = RigidTransform(grasp_corrected_target(
                     method.pedestal_target(cfg), ped[1].X_RG, world.kin.gripper_pose(world.arm_q()),
-                    base.to_robot_frame(world.X_WR(), world.block_poses()[block_id])))
-                ped = method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg, target=X_T)
+                    base.to_robot_frame(world.X_WR(), X_held)))
+                ped = method.plan_ped_place(in_R(X_held), cfg, target=X_T)
             do("pedestal_set", ex.run_waypoints, world, ped, cfg.WAYPOINT_SPEED_MS, label="pedestal set-down",
                first_index=0)
             if cfg.PERCEPTION:  # where it landed on the post, from the cameras (stage 3b); outside the tower box
@@ -150,14 +160,12 @@ class RealMover:
                                                    label="on the pedestal")
             else:
                 X_on_post = world.block_poses()[block_id]
-            do("regrab", ex.run_plan, world, method.plan_regrab(in_R(X_on_post), cfg), cfg.WAYPOINT_SPEED_MS,
-               label="regrab")
+            grasp("regrab", X_on_post, method.plan_regrab, "regrab")
         else:
             # ---- pull
             k_pull = method.choose_station(tower, block_id, cfg, world.station)
             do("roll_to_pull", ex.move_base_to_station, world, k_pull)
-            do("pull", ex.run_plan, world, method.plan_pull(in_R(tower.block_pose(block_id)), cfg),
-               cfg.WAYPOINT_SPEED_MS, label="pull")
+            grasp("pull", tower.block_pose(block_id), method.plan_pull, "pull")
 
         # ---- place (the block stays in the hand while the base rolls)
         k_place = method.choose_place_station(tower, layer, slot, cfg, world.station)
@@ -170,7 +178,7 @@ class RealMover:
         if i is not None:  # aim the block, not the hand: it slides in the pads during the roll (D-08)
             X_RT = RigidTransform(grasp_corrected_target(
                 X_RT, wps[i].X_RG, world.kin.gripper_pose(world.arm_q()),
-                base.to_robot_frame(world.X_WR(), world.block_poses()[block_id])))
+                base.to_robot_frame(world.X_WR(), held_pose("before the place"))))
             wps = method.plan_place(X_RT, cfg)
         do("place", ex.run_plan, world, wps, cfg.WAYPOINT_SPEED_MS, label="place", held=block_id)
         return TurnInfo(k_pull, k_place)

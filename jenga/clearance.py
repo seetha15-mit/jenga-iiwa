@@ -169,14 +169,15 @@ def preference_order(solutions, q_ref, margin_fn, good_margin: float) -> list:
 
 def swing_poses(world, held=None) -> dict:
     """Block poses for the swing check.  Truth, or with config.PERCEPTION the perceived ones (world.perceived, set by
-    perceive.observe and observe_block); the block in the hand is still truth there (perceiving it in the hand is not
-    done yet).  Blocks perception does not track (fallen off the tower) are left out."""
+    perceive.observe and observe_block), and the block in the hand from the cameras too (perceive.observe_held).
+    Blocks perception does not track (fallen off the tower) are left out."""
     truth = world.block_poses()
     if not world.cfg.PERCEPTION or getattr(world, "perceived", None) is None:
         return truth
+    from jenga import perceive  # here: perceive needs scipy, which the quick checks may not load
     poses = dict(world.perceived)
     if held is not None:
-        poses[held] = truth[held]
+        poses[held] = perceive.observe_held(world, world.cfg, held, label="held swing")
     return poses
 
 
