@@ -70,7 +70,8 @@ class TowerState:
         return self.blocks[block_id].X_WB
 
     def update_poses(self, poses: Dict[int, np.ndarray]) -> None:
-        """Copy the true poses from the simulator into the tower state."""
+        """Store block poses in the tower's bookkeeping (simulator truth, or perceived with config.PERCEPTION on).
+        Bookkeeping only: the simulated blocks do not move."""
         for bid, X in poses.items():
             self.blocks[bid].X_WB = np.array(X, dtype=float)
 
