@@ -61,5 +61,16 @@ class TestSegmentBlocks(unittest.TestCase):
         self.assertEqual(sum(len(v) for v in seg.values()), 0)
 
 
+
+class TestSegmentCrop(unittest.TestCase):
+    def test_a_crop_box_replaces_the_tower_box(self):
+        cfg = make_cfg(BLOCK_COLORS="unique")
+        far = np.array([[0.30, 0.30, 0.08]] * 10)   # a block on a pedestal: outside the tower box
+        rgb = np.tile(geo.block_color(cfg, 4), (10, 1))
+        self.assertEqual(sum(len(v) for v in sensing.segment_blocks(far, rgb, cfg).values()), 0)
+        seg = sensing.segment_blocks(far, rgb, cfg, crop=([0.25, 0.25, 0.05], [0.35, 0.35, 0.12]))
+        self.assertEqual(len(seg[4]), 10)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -156,7 +156,7 @@ DIAG_FIRST_BLOCK = None  # [user] development only: force the first pick to this
 
 # ------------------------------------------------------------------ sensing (notes only; the team decides)
 ENABLE_WRIST_FORCE_LOG = False  # [user] log the raw wrist force during motions
-PERCEPTION = False  # [user] the tower bookkeeping, pull targets and place heights come from the cameras (jenga/perceive.py, sensing.estimate_block_poses) instead of the simulator's truth; turns the cameras on.  Mid-turn reads (push method steps, block in the hand) and the swing check still use truth
+PERCEPTION = False  # [user] the tower bookkeeping, pull targets and place heights come from the cameras (jenga/perceive.py, sensing.estimate_block_poses) instead of the simulator's truth; turns the cameras on.  Also the push method's pushed block and the block on the pedestal, and the swing check's obstacles (stage 3b).  Still truth: the block IN THE HAND (pedestal swing and set-down, both grasp corrections, the held block in the swing check)
 ENABLE_CAMERAS = False  # [user] add the two RGB-D cameras below (scene.Sim.camera_images; rendered only when asked)
 CAMERA_WIDTH_PX = 1280  # [user] image width; 0.7 mm per pixel at the tower (~0.8 m away, derived), below the 0.875 mm finger margin; near a RealSense D415 (1280x720 depth)
 CAMERA_HEIGHT_PX = 960  # [user] image height; rendering both cameras ~45 ms per call on the Mac (measured; 640x480 was 20-90 ms)

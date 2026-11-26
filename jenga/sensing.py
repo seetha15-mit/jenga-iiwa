@@ -65,13 +65,15 @@ def block_model_points(cfg, spacing_m: float = 0.0005) -> np.ndarray:
 
 
 
-def segment_blocks(points_W: np.ndarray, rgb: np.ndarray, cfg) -> dict:
+def segment_blocks(points_W: np.ndarray, rgb: np.ndarray, cfg, crop=None) -> dict:
     """Split the camera points into blocks by colour.  points_W (N, 3), rgb (N, 3) in 0..1 (from
     pointcloud.camera_points_world, one or several cameras stacked).  Returns block id -> (M, 3) points.
     Each block's colour is geometry.block_color(cfg, block_id) (cfg.BLOCK_COLORS = "unique": one hue per block).
     Things to decide: compare by hue (shading changes brightness and saturation, not hue: scratch/palette_test.py);
     how to drop non-block pixels (table, robot, platform, sky: low saturation); what to do with edge pixels that
-    blend two blocks (about 1% of each block)."""
+    blend two blocks (about 1% of each block).
+    crop: optional (lower, upper) world corners of the box to keep instead of the tower box, e.g. around a pedestal
+    (stage 3b, perceive.observe_block); None = the tower box."""
     # ---- BEGIN CODE TO BE WRITTEN ----
     margin = 0.05
     L, W, H = geo.block_dims(cfg)
@@ -81,6 +83,8 @@ def segment_blocks(points_W: np.ndarray, rgb: np.ndarray, cfg) -> dict:
     z_high = cfg.PLATFORM_HEIGHT_M + 10 * (H + cfg.BLOCK_GAP_M) + margin
     lower = np.array([cx-half,cy-half,z_low])
     upper = np.array([cx+half,cy+half,z_high])
+    if crop is not None:  # another region instead of the tower (stage 3b: a block on a pedestal)
+        lower, upper = np.asarray(crop[0], float), np.asarray(crop[1], float)
     inside = np.all((points_W >= lower) & (points_W <= upper), axis=1)
 
 
@@ -135,7 +139,7 @@ def icp_pose(scene_points: np.ndarray, model_points: np.ndarray, X_init: np.ndar
 
 
 
-def estimate_block_poses(images: dict, cfg, guesses: dict) -> dict:
+def estimate_block_poses(images: dict, cfg, guesses: dict, crop=None) -> dict:
     """The perception step.  images: scene.Sim.camera_images() (name -> rgb, depth, K, X_WC; ignore "label").
     guesses: block id -> 4x4 world pose to start ICP from (the tower's bookkeeping).  Returns block id -> 4x4
     estimated world pose, for the blocks it could see.  Things to decide: which cameras to use; how few points
@@ -153,7 +157,7 @@ def estimate_block_poses(images: dict, cfg, guesses: dict) -> dict:
       allrgb.append(rgb)
     allpoints = np.vstack(allpoints)
     allrgb = np.vstack(allrgb)
-    seg = segment_blocks(allpoints, allrgb, cfg)
+    seg = segment_blocks(allpoints, allrgb, cfg, crop)
     for block in guesses:
       pts = seg.get(block, np.zeros((0, 3)))
       X_WB = guesses[block]

@@ -11,6 +11,7 @@ A block no camera sees keeps its guess.
 
 import numpy as np
 
+from jenga import base
 from jenga import geometry as geo
 from jenga import sensing
 
@@ -38,5 +39,39 @@ def observe(world, tower, cfg, last: dict):
     g = guesses(tower, cfg, last)
     est = sensing.estimate_block_poses(world.camera_images(), cfg, g)
     poses = {b: np.asarray(est.get(b, g[b]), dtype=float) for b in g}
+    world.perceived = dict(poses)  # the swing check's obstacles (clearance.swing_poses), updated by observe_block
     slot_of = {b: ls for ls, b in tower.slot_map.items()}
     return poses, {b: (slot_of[b], X) for b, X in poses.items()}, sorted(set(g) - set(est))
+
+
+# ---------------------------------------------------------------- mid-turn (stage 3b): one block where it should be
+PUSH_FRACTION = 0.4  # push.plan_push pushes the block 0.4 L (push_m = 0.4*L there): keep the two the same
+
+
+def pushed_guess(X_WB: np.ndarray, cfg, push_station: int) -> np.ndarray:
+    """Where a pushed block should be: its pose before the push, moved PUSH_FRACTION * L away from the push station
+    (along that station's approach direction)."""
+    X = np.array(X_WB, dtype=float)
+    X[:2, 3] += PUSH_FRACTION * geo.block_dims(cfg)[0] * base.approach_dir(cfg, push_station)
+    return X
+
+
+def box_around(X_WB: np.ndarray, cfg, margin: float = 0.03):
+    """(lower, upper) world box around a block at X_WB: a block length across in x and y (any turn), its height plus
+    `margin` above and below.  The crop for a block away from the tower (on a pedestal)."""
+    L, _, H = geo.block_dims(cfg)
+    c, r = np.asarray(X_WB, float)[:3, 3], L / 2 + margin
+    return c - [r, r, margin], c + [r, r, H + margin]
+
+
+def observe_block(world, cfg, block_id: int, guess: np.ndarray, crop=None, label: str = "") -> np.ndarray:
+    """One block's pose from the cameras, ICP started at `guess` (4x4 world).  If no camera finds it, the guess is
+    used and a line is printed.  Updates world.perceived for the swing check."""
+    est = sensing.estimate_block_poses(world.camera_images(), cfg, {block_id: guess}, crop=crop).get(block_id)
+    if est is None:
+        print(f"   [perception] {label}: block {block_id} not seen; using the expected pose")
+        est = guess
+    X = np.asarray(est, dtype=float)
+    if getattr(world, "perceived", None) is not None:
+        world.perceived[block_id] = X
+    return X

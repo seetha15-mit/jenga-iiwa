@@ -94,3 +94,63 @@ class TestHarnessSwitch(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMidTurn(unittest.TestCase):
+    """Stage 3b: one block where it should be (push, pedestal) and the swing check's obstacles."""
+
+    def setUp(self):
+        self.cfg = make_cfg()
+        self.L, self.W, self.H = geo.block_dims(self.cfg)
+
+    def test_pushed_guess_moves_the_block_away_from_the_push_station(self):
+        from jenga import base
+        X = geo.make_pose(0.0, 0.0, 0.15, yaw=0.0)
+        for k in range(len(self.cfg.STATION_ANGLES_DEG)):
+            G = perceive.pushed_guess(X, self.cfg, k)
+            np.testing.assert_allclose(G[:2, 3], 0.4 * self.L * base.approach_dir(self.cfg, k))
+            np.testing.assert_allclose(G[:3, :3], X[:3, :3])
+            self.assertEqual(G[2, 3], X[2, 3])
+
+    def test_box_around_holds_the_whole_block_at_any_turn(self):
+        from tests.test_icp_pose import face_points, moved
+        for yaw in (0.0, 0.7, 1.6):
+            X = geo.make_pose(0.2, 0.2, 0.07, yaw=yaw)
+            lo, hi = perceive.box_around(X, self.cfg)
+            pts = moved(face_points(self.cfg, ["top", "side", "end"]), X)
+            self.assertTrue(np.all((pts >= lo) & (pts <= hi)), yaw)
+
+    def test_observe_block_uses_the_estimate_and_records_it(self):
+        world = type("W", (), {})()
+        world.camera_images = lambda: {}
+        world.perceived = {}
+        X_est, guess = geo.make_pose(0.1, 0, 0.1), geo.make_pose(0.2, 0, 0.1)
+        with mock.patch.object(perceive.sensing, "estimate_block_poses", return_value={5: X_est}) as est:
+            out = perceive.observe_block(world, self.cfg, 5, guess, crop=("lo", "hi"))
+        self.assertEqual(est.call_args.kwargs["crop"], ("lo", "hi"))
+        np.testing.assert_allclose(out, X_est)
+        np.testing.assert_allclose(world.perceived[5], X_est)
+
+    def test_observe_block_falls_back_to_the_guess_when_unseen(self):
+        world = type("W", (), {})()
+        world.camera_images = lambda: {}
+        guess = geo.make_pose(0.2, 0, 0.1)
+        with mock.patch.object(perceive.sensing, "estimate_block_poses", return_value={}), \
+                mock.patch("builtins.print"):
+            out = perceive.observe_block(world, self.cfg, 5, guess)
+        np.testing.assert_allclose(out, guess)
+
+    def test_swing_poses(self):
+        from jenga import clearance
+        truth = {1: geo.make_pose(0, 0, 0.1), 2: geo.make_pose(0.1, 0, 0.1), 3: geo.make_pose(0.5, 0, 0.3)}
+        seen = {1: geo.make_pose(0.001, 0, 0.1), 2: geo.make_pose(0.101, 0, 0.1)}
+        world = type("W", (), {})()
+        world.block_poses = lambda: truth
+        world.perceived = seen
+        world.cfg = make_cfg(PERCEPTION=False)
+        self.assertIs(clearance.swing_poses(world, held=3), truth)            # off: truth, as before
+        world.cfg = make_cfg(PERCEPTION=True)
+        poses = clearance.swing_poses(world, held=3)
+        np.testing.assert_allclose(poses[1], seen[1])                          # obstacles: perceived
+        np.testing.assert_allclose(poses[3], truth[3])                         # the held block: still truth
+        self.assertEqual(set(clearance.swing_poses(world)), {1, 2})            # untracked blocks left out

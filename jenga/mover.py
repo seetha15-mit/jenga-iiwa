@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from jenga import base, clearance, diaglog, executor_api  # noqa: F401  (executor_api: lazy Drake import point)
-from jenga import methods
+from jenga import methods, perceive
 
 
 def _mat(X) -> np.ndarray:
@@ -117,14 +117,20 @@ class RealMover:
 
         if hasattr(method, "plan_push"):
             # ---- push (push method): from one end, the block slides part way out the far side
-            do("roll_to_push", ex.move_base_to_station, world, method.choose_station(tower, block_id, cfg, world.station))
+            k_push = method.choose_station(tower, block_id, cfg, world.station)
+            do("roll_to_push", ex.move_base_to_station, world, k_push)
             do("push", ex.run_plan, world, method.plan_push(in_R(tower.block_pose(block_id)), cfg), cfg.WAYPOINT_SPEED_MS,
                label="push")
             # ---- pull from the far end, then regrab; the block has moved, so its pose is read again
             k_pull = method.choose_pull_station(tower, block_id, cfg, world.station)
             do("roll_to_pull", ex.move_base_to_station, world, k_pull)
-            do("pull", ex.run_plan, world, method.plan_pull(in_R(world.block_poses()[block_id]), cfg),
-               cfg.WAYPOINT_SPEED_MS, label="pull")
+            if cfg.PERCEPTION:  # where the push left it, from the cameras at the pull station (stage 3b)
+                X_pushed = perceive.observe_block(world, cfg, block_id,
+                                                  perceive.pushed_guess(tower.block_pose(block_id), cfg, k_push),
+                                                  label="after the push")
+            else:
+                X_pushed = world.block_poses()[block_id]
+            do("pull", ex.run_plan, world, method.plan_pull(in_R(X_pushed), cfg), cfg.WAYPOINT_SPEED_MS, label="pull")
             # ---- set it on a pedestal, then regrab it from where it actually landed (D-22); each is its own plan,
             # so each starts with a joint move (this clears the hand's drift before the regrab grasp)
             # swing to above the post; then read where the block really sits in the hand (it slides 6-15 mm down
@@ -138,8 +144,14 @@ class RealMover:
                 ped = method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg, target=X_T)
             do("pedestal_set", ex.run_waypoints, world, ped, cfg.WAYPOINT_SPEED_MS, label="pedestal set-down",
                first_index=0)
-            do("regrab", ex.run_plan, world, method.plan_regrab(in_R(world.block_poses()[block_id]), cfg),
-               cfg.WAYPOINT_SPEED_MS, label="regrab")
+            if cfg.PERCEPTION:  # where it landed on the post, from the cameras (stage 3b); outside the tower box
+                X_post = np.asarray(world.X_WR(), float) @ np.asarray(method.pedestal_target(cfg).GetAsMatrix4())
+                X_on_post = perceive.observe_block(world, cfg, block_id, X_post, crop=perceive.box_around(X_post, cfg),
+                                                   label="on the pedestal")
+            else:
+                X_on_post = world.block_poses()[block_id]
+            do("regrab", ex.run_plan, world, method.plan_regrab(in_R(X_on_post), cfg), cfg.WAYPOINT_SPEED_MS,
+               label="regrab")
         else:
             # ---- pull
             k_pull = method.choose_station(tower, block_id, cfg, world.station)
