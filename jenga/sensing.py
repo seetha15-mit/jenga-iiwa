@@ -70,7 +70,32 @@ def segment_blocks(points_W: np.ndarray, rgb: np.ndarray, cfg) -> dict:
     how to drop non-block pixels (table, robot, platform, sky: low saturation); what to do with edge pixels that
     blend two blocks (about 1% of each block)."""
     # ---- BEGIN CODE TO BE WRITTEN ----
-    raise NotImplementedError("segment_blocks: CODE TO BE WRITTEN")
+    margin = 0.05
+    L, W, H = geo.block_dims(cfg)
+    cx,cy = cfg.TOWER_CENTER_XY
+    half = 0.5*geo.tower_footprint_m(cfg)+margin
+    z_low = cfg.PLATFORM_HEIGHT_M+0.0001
+    z_high = cfg.PLATFORM_HEIGHT_M + 10 * (H + cfg.BLOCK_GAP_M) + margin
+    lower = np.array([cx-half,cy-half,z_low])
+    upper = np.array([cx+half,cy+half,z_high])
+    inside = np.all((points_W >= lower) & (points_W <= upper), axis=1)
+
+
+    from matplotlib.colors import rgb_to_hsv
+    hsv = rgb_to_hsv(rgb)
+    keep = inside & (hsv[:, 1] > 0.3)
+    pts = points_W[keep]
+    hue = hsv[keep, 0]
+
+    ids = range(3 * cfg.N_LAYERS_START)
+    block_hue = []
+    for b_id in ids:
+        bcolorrgb = np.array(geo.block_color(cfg,b_id))
+        block_hue.append(rgb_to_hsv(bcolorrgb)[0])
+    block_hue = np.array(block_hue)
+    dist = (hue[:, None] - block_hue[None, :] + 0.5) % 1 - 0.5
+    nearest = np.abs(dist).argmin(axis=1)
+    return {b: pts[nearest == i] for i, b in enumerate(ids)}
     # ---- END CODE TO BE WRITTEN ----
 
 
