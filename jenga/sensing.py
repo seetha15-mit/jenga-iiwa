@@ -138,5 +138,28 @@ def estimate_block_poses(images: dict, cfg, guesses: dict) -> dict:
     estimated world pose, for the blocks it could see.  Things to decide: which cameras to use; how few points
     is too few to trust; what to return for a block nobody sees."""
     # ---- BEGIN CODE TO BE WRITTEN ----
-    raise NotImplementedError("estimate_block_poses: CODE TO BE WRITTEN")
+    from jenga import pointcloud
+    model = block_model_points(cfg)
+    allpoints = []
+    allrgb = []
+    out = {}
+    L, W, H = geo.block_dims(cfg)
+    for im in images.values():
+      points, rgb, pixels = pointcloud.camera_points_world(im)
+      allpoints.append(points)
+      allrgb.append(rgb)
+    allpoints = np.vstack(allpoints)
+    allrgb = np.vstack(allrgb)
+    seg = segment_blocks(allpoints, allrgb, cfg)
+    for block in guesses:
+      pts = seg.get(block, np.zeros((0, 3)))
+      X_WB = guesses[block]
+      bfpoints = (pts - X_WB[:3,3])@X_WB[:3,:3]
+      m=0.01
+      near = (np.abs(bfpoints[:, 0]) < L/2 + m) & (np.abs(bfpoints[:, 1]) < W/2 + m) & (bfpoints[:, 2] > -m) & (bfpoints[:, 2] < H + m)
+      pts = pts[near]
+      if len(pts)<50:
+        continue
+      out[block] = icp_pose(pts, model, guesses[block])
+    return out
     # ---- END CODE TO BE WRITTEN ----
