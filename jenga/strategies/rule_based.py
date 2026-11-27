@@ -2,7 +2,7 @@
 
 Chooses a block using the exact tower state (course approach (b)): for example favour outside blocks
 in upper layers, or blocks whose neighbours give the most support.  Runs on equal-friction towers
-(and also on varied-friction towers, as a comparison for the force strategy).
+(and also on varied-friction towers, as the baseline for the force probe, D-28).
 """
 import numpy as np
 

@@ -213,6 +213,15 @@ class TestResultsGuard(unittest.TestCase):
         self.assertEqual(table[0]["trials"], 3)
         self.assertIn("blocks", results.format_table(table))
 
+    def test_trials_record_the_layers_and_the_table_keeps_them_apart(self):
+        self._run(helpers.RealLikeMover(), n=2)
+        rows = results.read_trials(self.root / "runs", self.cfg)
+        self.assertEqual({(r["perception"], r["probe"]) for r in rows}, {("False", "False")})
+        probed = [dict(r, probe="True") for r in rows]
+        old = [{k: v for k, v in r.items() if k not in ("perception", "probe")} for r in rows]  # before the columns
+        table = results.build_table(rows + probed + old)
+        self.assertEqual([(t["probe"], t["trials"]) for t in table], [("False", 4), ("True", 2)])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -95,6 +95,9 @@ def check_reachability(cfg, shared):
 # ---------------------------------------------------------------- 2. scene builds, tower stands still
 def check_scene_and_static(cfg, shared):
     sim = _sim(cfg, shared)
+    built = sim.block_poses()
+    sim.hold(cfg.STATIC_SETTLE_S)  # the BLOCK_GAP_M build gaps close first: layers drop onto each other (D-25)
+    settle = _max_move(sim, built)
     before = sim.block_poses()
     t0, s0 = time.time(), sim.time()
     sim.hold(cfg.STATIC_CHECK_S)
@@ -103,7 +106,8 @@ def check_scene_and_static(cfg, shared):
     shared["speed"] = simd / wall if wall > 0 else float("nan")
     detail = (f"scene built in {shared['build_s']:.1f} s; {simd:.1f} s simulated in {wall:.1f} s wall "
               f"({shared['speed']:.2f}x real time); largest block movement {move * 1000:.2f} mm "
-              f"(limit {cfg.STATIC_MAX_MOVE_M * 1000:.1f} mm); {sim.describe()}")
+              f"(limit {cfg.STATIC_MAX_MOVE_M * 1000:.1f} mm) after settling {cfg.STATIC_SETTLE_S:.1f} s first "
+              f"(the build gaps closing moved blocks up to {settle * 1000:.2f} mm); {sim.describe()}")
     if move > cfg.STATIC_MAX_MOVE_M:
         return "FAIL", f"the tower moved {move * 1000:.2f} mm while standing still", detail
     return "PASS", f"the tower stands still ({move * 1000:.2f} mm in {cfg.STATIC_CHECK_S:.0f} s)", detail

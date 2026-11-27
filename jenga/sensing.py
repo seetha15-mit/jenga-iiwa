@@ -1,5 +1,5 @@
-"""SENSING: notes for the team, and the perception steps the team writes (bottom of the file).  The person who
-owns the force and perception strategies decides the interface, the weight compensation and the camera setup.
+"""SENSING: facts about the wrist force sensor and the cameras, and the perception steps (bottom of the file).
+Perception (config PERCEPTION, D-27) and the force probe (config PROBE_ENABLED, D-28) use them under any strategy.
 
 Facts (see DECISIONS.md for sources)
   * Wrist force: the simulator can report the reaction at the weld between the arm and the gripper
@@ -16,7 +16,7 @@ Facts (see DECISIONS.md for sources)
   * Cameras: two RGB-D cameras, "base" (turns with the robot) and "top" (config ENABLE_CAMERAS and CAMERA_*;
     scene.Sim.camera_images).  The TA's advice: use several cameras to reduce partial observability; perception is
     harder than expected.
-  * Probing with the force strategy needs motions: how a strategy commands them is open.  The executor can sample
+  * Probing needs motions.  The executor can sample
     the force during a motion (run_waypoints force_trace) and stop at a waypoint (run_waypoints stop_at), not at
     an arbitrary instant: a check runs only as the hand reaches each waypoint.
   * The probe (jenga/probe.py, D-28) uses both: a fixed 2 mm leg inside the push or pull, tared on the sample as

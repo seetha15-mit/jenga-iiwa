@@ -23,7 +23,7 @@ MAX_CONSECUTIVE_FAILURES = 2  # [estimate] a trial ends after this many failed t
 START_SETTLE_S = 1.0  # [estimate] the tower stands this long before the first turn, so a replay opens on the intact tower
 MOVER = "fake"  # [user] "fake" = teleport placeholder (results INVALID), "real" = the team's steps
 EXTRACTION_METHOD = "mixed"  # [user] "mixed" (default: push middles, end-pinch edges; D-07, D-26), "end_pinch" (edges only) or "push" (middles only: push, pull, pedestal regrab, place; D-21)
-STRATEGY = "random"  # [course] "random", "rule_based", "perception", "force_guided"
+STRATEGY = "random"  # [course] "random" or "rule_based"; perception (PERCEPTION) and the force probe (PROBE_ENABLED) work under either
 COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 
 # ------------------------------------------------------------------ blocks
@@ -174,6 +174,7 @@ PROBE_MAX_PUSH_N = 4.0  # [user] the same for a push (fingertips, no grip: a dif
 PROBE_MAX_PER_TURN = 3  # [user] rejections allowed per turn; then (or when no candidate is left) the least-resisting probed block is taken without a probe
 
 # ------------------------------------------------------------------ run_checks.py
+STATIC_SETTLE_S = 1.0  # [measured] the tower settles this long before the check, as the BLOCK_GAP_M build gaps close (D-25): 2.61 mm, then 0.00 mm in the 3 s check
 STATIC_CHECK_S = 3.0  # [measured] the prototype used 3 s of rest for the stable-tower check
 STATIC_MAX_MOVE_M = 0.002  # [estimate] a block moving more than this during the check fails it
 REACH_CHECK_LAYERS = 6  # [user] all of these layers (plus the placement level) must be reachable

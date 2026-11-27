@@ -10,7 +10,9 @@ Every strategy is one function with the same signature:
               Return one of these.
   cfg         the config module.
   rng         numpy Generator, seeded per trial (use it for any randomness, never numpy's global one).
-  sensors     reserved for the perception and force strategies (the team decides what goes here).
+  sensors     unused.  Perception (config PERCEPTION, D-27) and the force probe (config PROBE_ENABLED, D-28)
+              are layers that work under any strategy, not strategies: perception replaces the poses in
+              `tower`; the probe drops a block that resists from `candidates` and asks again.
 
 HIDDEN from every strategy: per-block friction and exact contact forces.  Never import from
 jenga.evaluation or read the simulator's truth.
@@ -22,8 +24,6 @@ import importlib
 REGISTRY = {
     "random": "jenga.strategies.random_baseline",
     "rule_based": "jenga.strategies.rule_based",
-    "perception": "jenga.strategies.perception",
-    "force_guided": "jenga.strategies.force_guided",
 }
 
 

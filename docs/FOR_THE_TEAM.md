@@ -24,10 +24,12 @@ so make it a pose that is clear of the tower. If IK fails for a pose, try the sa
 The CSV says what happened (`outcome`, `mover_error`).
 
 ## 2. The strategies
-`jenga/strategies/`: `rule_based.py`, `perception.py`, `force_guided.py`. One function each: `select_block(tower, candidates, cfg, rng, sensors=None)`
-returns one block id from `candidates`. Use the `rng` passed in for any randomness. `random_baseline.py` is a working example. Hidden from
-strategies: per-block friction and exact contact forces. The first block of every trial is random, whatever the strategy (course rule).
-Force and perception need sensors: read `jenga/sensing.py` (notes only; nobody has decided the interface).
+`jenga/strategies/`: `random_baseline.py` and `rule_based.py` (config `STRATEGY`). One function each:
+`select_block(tower, candidates, cfg, rng, sensors=None)` returns one block id from `candidates`. Use the `rng` passed in for any randomness.
+Hidden from strategies: per-block friction and exact contact forces. The first block of every trial is random, whatever the strategy (course rule).
+Perception and the force probe are layers that work under either strategy, not strategies of their own: `PERCEPTION` (D-27) replaces the
+simulator's block poses with what two cameras see (`jenga/perceive.py`), and `PROBE_ENABLED` (D-28) nudges each chosen block first and, if it
+resists, drops it from the candidates and asks the strategy again (`jenga/probe.py`). Sensor facts: `jenga/sensing.py`.
 
 ## 3. The advanced collapse detector
 `jenga/evaluation/collapse.py`, function `advanced(truth, cfg)`; set `COLLAPSE_DETECTOR = "advanced"`. It receives true block poses before and

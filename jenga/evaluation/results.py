@@ -34,16 +34,19 @@ def read_trials(runs_dir, cfg=None):
 
 
 def build_table(rows):
-    """Group trials by (strategy, friction_mode) and summarise blocks_replaced."""
+    """Group trials by (strategy, friction_mode, perception, probe) and summarise blocks_replaced.
+    Rows written before the perception and probe columns existed count as both off."""
     groups = {}
     for r in rows:
-        groups.setdefault((r["strategy"], r["friction_mode"]), []).append(r)
+        key = (r["strategy"], r["friction_mode"], r.get("perception") or "False", r.get("probe") or "False")
+        groups.setdefault(key, []).append(r)
     table = []
-    for (strategy, friction), rs in sorted(groups.items()):
+    for (strategy, friction, perception, probe), rs in sorted(groups.items()):
         n = [int(r["blocks_replaced"]) for r in rs]
         collapsed = sum(1 for r in rs if r["collapsed"] == "True")
         table.append(dict(
-            strategy=strategy, friction_mode=friction, trials=len(rs), mean_blocks=round(statistics.mean(n), 2),
+            strategy=strategy, friction_mode=friction, perception=perception, probe=probe, trials=len(rs),
+            mean_blocks=round(statistics.mean(n), 2),
             median_blocks=statistics.median(n), min_blocks=min(n), max_blocks=max(n),
             sd_blocks=round(statistics.pstdev(n), 2), collapse_rate=round(collapsed / len(rs), 2),
             reached_4=sum(1 for v in n if v >= 4),
@@ -52,8 +55,8 @@ def build_table(rows):
 
 
 def format_table(table) -> str:
-    cols = ["strategy", "friction_mode", "trials", "mean_blocks", "median_blocks", "min_blocks", "max_blocks",
-            "sd_blocks", "collapse_rate", "reached_4"]
+    cols = ["strategy", "friction_mode", "perception", "probe", "trials", "mean_blocks", "median_blocks", "min_blocks",
+            "max_blocks", "sd_blocks", "collapse_rate", "reached_4"]
     widths = [max(len(c), *(len(str(t[c])) for t in table)) if table else len(c) for c in cols]
     lines = ["  ".join(c.ljust(w) for c, w in zip(cols, widths))]
     for t in table:
