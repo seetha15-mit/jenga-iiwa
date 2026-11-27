@@ -10,7 +10,7 @@ from jenga.tower import TowerState
 from tests.helpers import make_cfg
 
 STUB_FILES = [
-    "jenga/strategies/rule_based.py", "jenga/strategies/perception.py", "jenga/strategies/force_guided.py",
+    "jenga/strategies/rule_based.py",
     "jenga/methods/end_pinch.py", "jenga/clearance.py", "jenga/evaluation/collapse.py",
 ]
 
@@ -25,11 +25,12 @@ class TestStrategies(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertTrue(all(x in cands for x in a))
 
-    def test_team_stubs_raise_not_implemented(self):
-        cfg, t = make_cfg(), TowerState(make_cfg())
-        for name in ("perception", "force_guided"):  # rule_based is written (Katie)
-            with self.assertRaises(NotImplementedError):
-                strategies.get_strategy(name)(t, [0], cfg, np.random.default_rng(0))
+    def test_only_random_and_rule_based_are_strategies(self):
+        # perception and the force probe are layers under either (PERCEPTION, PROBE_ENABLED), not strategies
+        self.assertEqual(sorted(strategies.REGISTRY), ["random", "rule_based"])
+        for name in ("perception", "force_guided"):
+            with self.assertRaises(ValueError):
+                strategies.get_strategy(name)
 
 
 class TestRuleBased(unittest.TestCase):

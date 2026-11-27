@@ -38,8 +38,8 @@ TURN_COLUMNS = [
     "perception_unseen", "perception_max_height_mm", "perception_max_pos_mm",
 ]
 TRIAL_COLUMNS = [
-    "trial", "seed", "strategy", "extraction_method", "mover", "friction_mode", "n_layers_start", "block_scale",
-    "contact_model", "turns_attempted", "blocks_replaced", "collapsed", "end_reason", "collapse_reason",
+    "trial", "seed", "strategy", "extraction_method", "mover", "friction_mode", "perception", "probe",
+    "n_layers_start", "block_scale", "contact_model", "turns_attempted", "blocks_replaced", "collapsed", "end_reason", "collapse_reason",
     "first_block", "arm_collisions_unchecked", "sim_seconds", "wall_seconds", "replay_file",
 ]
 PROBE_COLUMNS = [
@@ -255,7 +255,8 @@ def run_trial(cfg, trial: int, mover, out_dir: Path, strategy: str = None, make_
     if cfg.ENABLE_WRIST_FORCE_LOG:
         world.save_force_log(out_dir / f"trial_{trial:02d}_wrist_force.csv")
     sim_seconds, wall_seconds = world.time() - sim_trial0, time.time() - wall_trial0
-    summary = dict(common, turns_attempted=turns, blocks_replaced=replaced, collapsed=collapsed,
+    summary = dict(common, perception=cfg.PERCEPTION, probe=cfg.PROBE_ENABLED,  # the layers on (D-27, D-28)
+                   turns_attempted=turns, blocks_replaced=replaced, collapsed=collapsed,
                    end_reason=end_reason, collapse_reason=collapse_reason, first_block=first_block,
                    sim_seconds=round(sim_seconds, 1), wall_seconds=round(wall_seconds, 1), replay_file=replay_file)
     _append_csv(out_dir / "trials.csv", TRIAL_COLUMNS, summary)

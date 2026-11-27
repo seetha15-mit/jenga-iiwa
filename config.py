@@ -23,7 +23,7 @@ MAX_CONSECUTIVE_FAILURES = 2  # [estimate] a trial ends after this many failed t
 START_SETTLE_S = 1.0  # [estimate] the tower stands this long before the first turn, so a replay opens on the intact tower
 MOVER = "fake"  # [user] "fake" = teleport placeholder (results INVALID), "real" = the team's steps
 EXTRACTION_METHOD = "mixed"  # [user] "mixed" (default: push middles, end-pinch edges; D-07, D-26), "end_pinch" (edges only) or "push" (middles only: push, pull, pedestal regrab, place; D-21)
-STRATEGY = "random"  # [course] "random", "rule_based", "perception", "force_guided"
+STRATEGY = "random"  # [course] "random" or "rule_based"; perception (PERCEPTION) and the force probe (PROBE_ENABLED) work under either
 COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 
 # ------------------------------------------------------------------ blocks

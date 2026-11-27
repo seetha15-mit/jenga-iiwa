@@ -19,7 +19,7 @@ Why things are the way they are: `docs/DECISIONS.md`.
 | `jenga/tower.py`, `jenga/geometry.py`, `jenga/base.py` | tower state and rules, sizes, base stations and paths (plain Python) |
 | `jenga/scene.py`, `jenga/executor.py`, `jenga/controller.py`, `jenga/kinematics.py` | the Drake side: one persistent simulator, motions, IK |
 | `jenga/methods/` | extraction methods. `end_pinch.py` has the team's `plan_pull` and `plan_place` |
-| `jenga/strategies/` | block selection: `random_baseline.py` works, the others are team stubs |
+| `jenga/strategies/` | block selection: `random_baseline.py` and `rule_based.py`; perception and the force probe are layers under either (`PERCEPTION`, `PROBE_ENABLED`) |
 | `jenga/evaluation/` | collapse detector, turn outcomes, the harness, the results table (never visible to strategies) |
 | `jenga/mover.py` | the fake mover (placeholder) and the real one (calls the team's steps) |
 | `runs/`, `runs_fake/` | real and fake outputs: CSVs and `trial_XX_replay.html` (open in a browser to watch at normal speed) |
