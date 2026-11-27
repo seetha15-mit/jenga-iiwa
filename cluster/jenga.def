@@ -1,11 +1,14 @@
 Bootstrap: docker
 From: ubuntu:24.04
 
+%files
+    cluster/requirements.lock /opt/requirements.lock
+
 %post
     apt-get update
     apt-get install -y --no-install-recommends python3 python3-venv python3-pip ca-certificates libgl1 libglu1-mesa libx11-6 libsm6 libglib2.0-0t64 libegl1 libegl-mesa0 libgl1-mesa-dri
     python3 -m venv /opt/venv
-    /opt/venv/bin/pip install drake==1.57.0 "manipulation[letter]" scipy rtree
+    /opt/venv/bin/pip install -r /opt/requirements.lock  # exact versions (drake 1.57.0, manipulation[letter], scipy, rtree and their dependencies)
 
 %environment
     export PATH=/opt/venv/bin:$PATH

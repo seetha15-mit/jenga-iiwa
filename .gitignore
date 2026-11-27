@@ -9,6 +9,6 @@ __pycache__/
 .venv/
 scratch/
 runs_scratch/*
-jenga.sif
+*.sif
 logs/*
 !logs/.gitkeep
