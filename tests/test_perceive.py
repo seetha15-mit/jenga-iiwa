@@ -1,0 +1,202 @@
+"""Perception in games (stage 3): perceive.guesses, harness.perception_error, and the harness switch.
+Pure Python: the cameras and estimate_block_poses are replaced, so no Drake or renderer is needed."""
+
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+import numpy as np
+
+from jenga import geometry as geo
+from jenga import perceive
+from jenga.evaluation import harness
+from jenga.mover import FakeMover
+from jenga.tower import TowerState
+from tests.helpers import MockWorld, make_cfg
+
+
+class TestGuesses(unittest.TestCase):
+    def setUp(self):
+        self.cfg = make_cfg()
+        self.tower = TowerState(self.cfg)
+        self.H = geo.block_dims(self.cfg)[2]
+
+    def test_trial_start_uses_the_settled_height(self):
+        g = perceive.guesses(self.tower, self.cfg, {})
+        self.assertEqual(set(g), set(self.tower.slot_map.values()))
+        for (layer, slot), b in self.tower.slot_map.items():
+            self.assertAlmostEqual(g[b][2, 3], self.cfg.PLATFORM_HEIGHT_M + layer * self.H)  # no gaps
+            np.testing.assert_allclose(g[b][:2, 3], self.tower.target_pose(layer, slot)[:2, 3])  # built x, y
+
+    def test_a_block_in_the_same_slot_starts_from_its_last_perceived_pose(self):
+        b = self.tower.slot_map[(2, 1)]
+        X = geo.make_pose(0.001, 0.002, 0.3, yaw=0.1)
+        g = perceive.guesses(self.tower, self.cfg, {b: ((2, 1), X)})
+        np.testing.assert_allclose(g[b], X)
+
+    def test_a_block_in_a_new_slot_starts_from_that_slot(self):
+        b = self.tower.slot_map[(0, 0)]
+        last = {b: ((0, 0), geo.make_pose(0.5, 0.5, 0.5))}
+        top = self.tower.top_layer() + 1
+        self.tower.remove_from_slot(b)
+        self.tower.place(b, top, 0)
+        g = perceive.guesses(self.tower, self.cfg, last)
+        self.assertAlmostEqual(g[b][2, 3], self.cfg.PLATFORM_HEIGHT_M + top * self.H)
+        np.testing.assert_allclose(g[b][:2, 3], self.tower.target_pose(top, 0)[:2, 3])
+
+
+class TestPerceptionError(unittest.TestCase):
+    def test_worst_errors_and_unseen_count(self):
+        truth = {0: geo.make_pose(0, 0, 0.1), 1: geo.make_pose(0.1, 0, 0.1), 2: geo.make_pose(0.2, 0, 0.1)}
+        seen = {b: X.copy() for b, X in truth.items()}
+        seen[0][2, 3] += 0.0005   # 0.5 mm high
+        seen[1][0, 3] += 0.002    # 2 mm sideways
+        seen[2][2, 3] += 0.05     # way off, but nobody saw it: its guess, not scored
+        cols = harness.perception_error(seen, truth, unseen=[2])
+        self.assertEqual(cols, dict(perception_unseen=1, perception_max_height_mm=0.5, perception_max_pos_mm=2.0))
+
+
+class TestHarnessSwitch(unittest.TestCase):
+    def run_one(self, cfg):
+        with tempfile.TemporaryDirectory() as tmp:
+            harness.run_trial(cfg, 0, FakeMover(), Path(tmp), make_world=MockWorld, log=lambda *_: None)
+            return (Path(tmp) / "turns.csv").read_text().splitlines()
+
+    def test_off_reads_truth_and_leaves_the_columns_empty(self):
+        with mock.patch.object(perceive, "observe") as observe:
+            rows = self.run_one(make_cfg(RECORD_REPLAY=False, MAX_TURNS=2, PERCEPTION=False))
+        observe.assert_not_called()
+        header = rows[0].split(",")
+        i = header.index("perception_unseen")
+        self.assertEqual(rows[1].split(",")[i], "")
+
+    def test_on_calls_observe_every_turn_and_logs_its_error(self):
+        calls = []
+
+        def fake_observe(world, tower, cfg, last):
+            calls.append(dict(last))
+            poses = {b: X.copy() for b, X in world.block_poses().items() if b in tower.slot_map.values()}
+            for X in poses.values():
+                X[2, 3] += 0.0003  # perception 0.3 mm high everywhere
+            return poses, {b: ((0, 0), X) for b, X in poses.items()}, []
+
+        with mock.patch.object(perceive, "observe", side_effect=fake_observe):
+            rows = self.run_one(make_cfg(RECORD_REPLAY=False, MAX_TURNS=2, PERCEPTION=True))
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0], {})      # a trial starts with nothing seen
+        self.assertNotEqual(calls[1], {})   # the next turn starts from what was seen
+        header = rows[0].split(",")
+        row = dict(zip(header, rows[1].split(",")))
+        self.assertEqual(row["perception_unseen"], "0")
+        self.assertEqual(float(row["perception_max_height_mm"]), 0.3)
+
+
+
+class TestMidTurn(unittest.TestCase):
+    """Stage 3b: one block where it should be (push, pedestal) and the swing check's obstacles."""
+
+    def setUp(self):
+        self.cfg = make_cfg()
+        self.L, self.W, self.H = geo.block_dims(self.cfg)
+
+    def test_pushed_guess_moves_the_block_away_from_the_push_station(self):
+        from jenga import base
+        X = geo.make_pose(0.0, 0.0, 0.15, yaw=0.0)
+        for k in range(len(self.cfg.STATION_ANGLES_DEG)):
+            G = perceive.pushed_guess(X, self.cfg, k)
+            np.testing.assert_allclose(G[:2, 3], 0.4 * self.L * base.approach_dir(self.cfg, k))
+            np.testing.assert_allclose(G[:3, :3], X[:3, :3])
+            self.assertEqual(G[2, 3], X[2, 3])
+
+    def test_box_around_holds_the_whole_block_at_any_turn(self):
+        from tests.test_icp_pose import face_points, moved
+        for yaw in (0.0, 0.7, 1.6):
+            X = geo.make_pose(0.2, 0.2, 0.07, yaw=yaw)
+            lo, hi = perceive.box_around(X, self.cfg)
+            pts = moved(face_points(self.cfg, ["top", "side", "end"]), X)
+            self.assertTrue(np.all((pts >= lo) & (pts <= hi)), yaw)
+
+    def test_observe_block_uses_the_estimate_and_records_it(self):
+        world = type("W", (), {})()
+        world.camera_images = lambda: {}
+        world.perceived = {}
+        X_est, guess = geo.make_pose(0.1, 0, 0.1), geo.make_pose(0.2, 0, 0.1)
+        with mock.patch.object(perceive.sensing, "estimate_block_poses", return_value={5: X_est}) as est:
+            out = perceive.observe_block(world, self.cfg, 5, guess, crop=("lo", "hi"))
+        self.assertEqual(est.call_args.kwargs["crop"], ("lo", "hi"))
+        np.testing.assert_allclose(out, X_est)
+        np.testing.assert_allclose(world.perceived[5], X_est)
+
+    def test_observe_block_falls_back_to_the_guess_when_unseen(self):
+        world = type("W", (), {})()
+        world.camera_images = lambda: {}
+        guess = geo.make_pose(0.2, 0, 0.1)
+        with mock.patch.object(perceive.sensing, "estimate_block_poses", return_value={}), \
+                mock.patch("builtins.print"):
+            out = perceive.observe_block(world, self.cfg, 5, guess)
+        np.testing.assert_allclose(out, guess)
+
+    def test_swing_poses(self):
+        from jenga import clearance
+        truth = {1: geo.make_pose(0, 0, 0.1), 2: geo.make_pose(0.1, 0, 0.1), 3: geo.make_pose(0.5, 0, 0.3)}
+        seen = {1: geo.make_pose(0.001, 0, 0.1), 2: geo.make_pose(0.101, 0, 0.1)}
+        world = type("W", (), {})()
+        world.block_poses = lambda: truth
+        world.perceived = seen
+        world.cfg = make_cfg(PERCEPTION=False)
+        self.assertIs(clearance.swing_poses(world, held=3), truth)            # off: truth, as before
+        world.cfg = make_cfg(PERCEPTION=True)
+        in_hand = geo.make_pose(0.49, 0, 0.3)
+        with mock.patch.object(perceive, "observe_held", return_value=in_hand) as held:
+            poses = clearance.swing_poses(world, held=3)
+        self.assertEqual(held.call_args.args[2], 3)
+        np.testing.assert_allclose(poses[1], seen[1])                          # obstacles: perceived
+        np.testing.assert_allclose(poses[3], in_hand)                          # the held block: perceived in the hand
+        self.assertEqual(set(clearance.swing_poses(world)), {1, 2})            # untracked blocks left out
+
+
+class TestInHand(unittest.TestCase):
+    """Stage 3b: the grasp is remembered when the fingers close; the held block is perceived from it."""
+
+    def setUp(self):
+        self.cfg = make_cfg()
+
+    def wp(self, X, opening):
+        from jenga.waypoint import Waypoint
+        return Waypoint(X, opening)
+
+    def test_grasp_index_is_where_the_fingers_first_close(self):
+        A, B = geo.make_pose(0, 0, 0), geo.make_pose(0.1, 0, 0)
+        plan = [self.wp(A, None), self.wp(B, None), self.wp(B, 0.09), self.wp(B, 0.08), self.wp(A, 0.08)]
+        self.assertEqual(perceive.grasp_index(plan, self.cfg), 2)
+        self.assertIsNone(perceive.grasp_index([self.wp(A, None), self.wp(B, None)], self.cfg))
+
+    def test_record_grasp_keeps_the_block_in_the_hand_frame(self):
+        X_RG = geo.make_pose(0.5, 0.1, 0.2, yaw=0.3)
+        X_RB = geo.make_pose(0.55, 0.12, 0.19, yaw=1.0)
+        world = type("W", (), {})()
+        perceive.record_grasp(world, self.cfg, 7, [self.wp(geo.make_pose(0, 0, 0), None), self.wp(X_RG, 0.09)], X_RB)
+        b, X_GB = world.held_grasp
+        self.assertEqual(b, 7)
+        np.testing.assert_allclose(X_RG @ X_GB, X_RB, atol=1e-12)  # hand at the grasp x grasp = the block
+
+    def test_observe_held_starts_from_the_hand_now(self):
+        X_WR = geo.make_pose(-0.9, 0.0, 0.0)
+        X_RG_now = geo.make_pose(0.6, 0.0, 0.3, yaw=0.2)
+        X_GB = geo.make_pose(0.0, 0.108, 0.01)
+        world = type("W", (), {})()
+        world.held_grasp = (7, X_GB)
+        world.X_WR = lambda: X_WR
+        world.arm_q = lambda: None
+        world.kin = type("K", (), {"gripper_pose": staticmethod(lambda q: X_RG_now)})()
+        with mock.patch.object(perceive, "observe_block", return_value="est") as ob:
+            self.assertEqual(perceive.observe_held(world, self.cfg, 7, "test"), "est")
+        guess = ob.call_args.args[3]
+        np.testing.assert_allclose(guess, X_WR @ X_RG_now @ X_GB)
+        lo, hi = ob.call_args.kwargs["crop"]
+        self.assertTrue(np.all(lo <= guess[:3, 3]) and np.all(guess[:3, 3] <= hi))
+
+
+if __name__ == "__main__":
+    unittest.main()

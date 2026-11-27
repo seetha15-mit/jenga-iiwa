@@ -167,6 +167,20 @@ def preference_order(solutions, q_ref, margin_fn, good_margin: float) -> list:
     return good + rest
 
 
+def swing_poses(world, held=None) -> dict:
+    """Block poses for the swing check.  Truth, or with config.PERCEPTION the perceived ones (world.perceived, set by
+    perceive.observe and observe_block), and the block in the hand from the cameras too (perceive.observe_held).
+    Blocks perception does not track (fallen off the tower) are left out."""
+    truth = world.block_poses()
+    if not world.cfg.PERCEPTION or getattr(world, "perceived", None) is None:
+        return truth
+    from jenga import perceive  # here: perceive needs scipy, which the quick checks may not load
+    poses = dict(world.perceived)
+    if held is not None:
+        poses[held] = perceive.observe_held(world, world.cfg, held, label="held swing")
+    return poses
+
+
 def choose_swing(world, X_RG, opening: float, held=None, label: str = ""):
     """Arm angles for a joint move to the gripper pose X_RG whose path keeps the gripper (and the held block, if
     any) at least SWING_CLEARANCE_M from every obstacle.  Tries the IK solutions in preference_order and takes the
@@ -185,7 +199,7 @@ def choose_swing(world, X_RG, opening: float, held=None, label: str = ""):
     if not sols:
         raise MotionFailed(f"{label}: no IK solution for the hand pose (is it reachable from this station?)")
     order = preference_order(sols, q_now, kin.joint_limit_margin, 0.15)  # 0.15: solve_ik_best's good_margin
-    poses = world.block_poses()
+    poses = swing_poses(world, held)
     fk = lambda q: np.asarray(kin.gripper_pose(q).GetAsMatrix4())  # noqa: E731
     X_WR = np.asarray(world.X_WR(), float)
     X_RG_now = fk(q_now)

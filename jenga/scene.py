@@ -31,13 +31,22 @@ import numpy as np
 from manipulation import ConfigureParser
 from pydrake.all import (
     AddMultibodyPlantSceneGraph,
+    CameraInfo,
+    ClippingRange,
+    ColorRenderCamera,
     ContactModel,
+    DepthRange,
+    DepthRenderCamera,
     DiagramBuilder,
     DiscreteContactApproximation,
+    MakeRenderEngineVtk,
     Meshcat,
     MeshcatVisualizer,
     Parser,
     PdControllerGains,
+    RenderCameraCore,
+    RenderEngineVtkParams,
+    RgbdSensor,
     RigidTransform,
     RollPitchYaw,
     RotationMatrix,
@@ -245,6 +254,9 @@ class Sim:
         if self.meshcat is not None:
             MeshcatVisualizer.AddToBuilder(builder, self.scene_graph, self.meshcat)
 
+        # ---- cameras (only with ENABLE_CAMERAS); Drake renders an image only when camera_images() asks for it
+        self.cameras = self._add_cameras(builder) if (cfg.ENABLE_CAMERAS or cfg.PERCEPTION) else {}
+
         self.diagram = builder.Build()
         self.simulator = Simulator(self.diagram)
         self.context = self.simulator.get_mutable_context()
@@ -271,8 +283,8 @@ class Sim:
         }
         mass = geo.block_mass(cfg)
         for bid in self.block_ids:
-            color = (0.80, 0.62, 0.40) if (bid // 3) % 2 == 0 else (0.68, 0.50, 0.30)
-            assets["blocks"][bid] = write_box_sdf(d / f"block_{bid:02d}.sdf", f"block_{bid:02d}", (L, W, H), color,
+            assets["blocks"][bid] = write_box_sdf(d / f"block_{bid:02d}.sdf", f"block_{bid:02d}", (L, W, H),
+                                                  geo.block_color(cfg, bid),
                                                   mass, self._friction[bid], cfg)
         return assets
 
@@ -336,6 +348,56 @@ class Sim:
             plant.SetDefaultPositions(self.base, np.array([base_mod.station_angles(cfg)[0]], float))
         for bid, inst in blocks.items():
             plant.SetDefaultPositions(inst, geo.free_body_q(tower.blocks[bid].X_WB))
+
+    # ------------------------------------------------------------------ cameras (perception, stage 1)
+    def _add_cameras(self, builder) -> dict:
+        """Two RGB-D cameras, as in the class notebooks but added by hand (no scenario file):
+          "base": fixed to the arm's mounting link (iiwa_link_0, the robot frame R), so it turns with the robot and
+                  always faces the side being worked on.  Placed beside the arm (CAMERA_BASE_EYE_M).
+          "top":  fixed to the world, CAMERA_TOP_HEIGHT_M straight above the tower, looking down.
+        Both look at the tower's axis at CAMERA_AIM_Z_M.  Returns name -> (sensor, parent body or None, X_PC)."""
+        cfg, plant = self.cfg, self.plant
+        self.scene_graph.AddRenderer("vtk", MakeRenderEngineVtk(RenderEngineVtkParams()))
+        info = CameraInfo(cfg.CAMERA_WIDTH_PX, cfg.CAMERA_HEIGHT_PX, np.radians(cfg.CAMERA_FOV_Y_DEG))
+        core = RenderCameraCore("vtk", info, ClippingRange(0.05, 5.0), RigidTransform())
+        color, depth = ColorRenderCamera(core, False), DepthRenderCamera(core, DepthRange(0.05, 5.0))
+        self.camera_K = np.array(info.intrinsic_matrix())  # 3x3 pinhole intrinsics, the same for both cameras
+
+        link0 = plant.GetBodyByName("iiwa_link_0", self.iiwa)
+        cx, cy = cfg.TOWER_CENTER_XY
+        aim_R = (cfg.STATION_STANDOFF_M, 0.0, cfg.CAMERA_AIM_Z_M - cfg.BASE_MOUNT_HEIGHT_M)  # tower axis in R
+        mounts = {
+            "base": (link0, geo.look_at(cfg.CAMERA_BASE_EYE_M, aim_R)),
+            "top": (None, geo.look_at((cx, cy, cfg.CAMERA_TOP_HEIGHT_M), (cx, cy, cfg.CAMERA_AIM_Z_M), up=(1, 0, 0))),
+        }
+        out = {}
+        for name, (body, X_PC) in mounts.items():
+            parent = plant.GetBodyFrameIdOrThrow(body.index()) if body is not None else self.scene_graph.world_frame_id()
+            sensor = builder.AddSystem(RgbdSensor(parent, RigidTransform(X_PC), color, depth))
+            sensor.set_name(f"camera_{name}")
+            builder.Connect(self.scene_graph.get_query_output_port(), sensor.query_object_input_port())
+            out[name] = (sensor, body, X_PC)
+        return out
+
+    def camera_images(self) -> dict:
+        """What each camera sees NOW.  name -> dict of
+            rgb   HxWx3 uint8
+            depth HxW float32, metres along the view (inf where nothing is in range)
+            label HxW int: Drake's exact segmentation.  TRUTH: for checking a perception method, never as its input
+            K     3x3 intrinsics;  X_WC  4x4 camera pose in the world (Drake camera axes: z view, x right, y down)
+        Empty if ENABLE_CAMERAS is off."""
+        pc = self._pc()
+        out = {}
+        for name, (sensor, body, X_PC) in self.cameras.items():
+            ctx = sensor.GetMyContextFromRoot(self.context)
+            X_WP = np.array(self.plant.EvalBodyPoseInWorld(pc, body).GetAsMatrix4()) if body is not None else np.eye(4)
+            out[name] = dict(
+                rgb=np.array(sensor.color_image_output_port().Eval(ctx).data[:, :, :3]),
+                depth=np.array(sensor.depth_image_32F_output_port().Eval(ctx).data[:, :, 0]),
+                label=np.array(sensor.label_image_output_port().Eval(ctx).data[:, :, 0]),
+                K=self.camera_K.copy(), X_WC=X_WP @ X_PC,
+            )
+        return out
 
     def _set_gains(self, instance, joint_names, kp, kd, what: str) -> None:
         """PD stiffness and damping for each named joint.  Each joint's actuator is found the way the pset does it

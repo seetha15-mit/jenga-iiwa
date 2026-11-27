@@ -128,6 +128,24 @@ class TestHarnessWithProbe(unittest.TestCase):
         self.assertEqual(row["outcome"], "collapse")
         self.assertIn("resisted", row["mover_error"])
 
+    def test_with_perception_a_rejection_reobserves_the_tower_instead_of_copying_truth(self):
+        from unittest import mock
+        from jenga import perceive
+        calls = []
+
+        def fake_observe(world, tower, cfg, last):
+            calls.append(len(calls))
+            poses = world.block_poses()
+            for X in poses.values():
+                X[0, 3] += 1e-4  # "perceived" = truth + 0.1 mm, so a copy of the truth would show
+            return poses, {}, []
+
+        m = ProbeMover(resistance={b: 10.0 for b in range(30)})  # everything resists
+        with mock.patch.object(perceive, "observe", side_effect=fake_observe):
+            s, out = self.run_trial(m, MAX_TURNS=1, PERCEPTION=True)
+        self.assertEqual(len(calls), 1 + 3)  # the turn's start, then once after each of the 3 rejections
+        self.assertEqual(read(out / "turns.csv")[0]["probes_rejected"], "3")
+
     def test_measure_only_never_rejects(self):
         m = ProbeMover(resistance={b: 50.0 for b in range(30)})
         s, out = self.run_trial(m, PROBE_MAX_PULL_N=None)

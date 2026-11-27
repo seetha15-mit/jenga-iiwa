@@ -90,7 +90,7 @@ class TestStepLog(unittest.TestCase):
 class LoggingMover(RealLikeMover):
     """Teleports like RealLikeMover and leaves a development log of one step, like RealMover."""
 
-    def do_turn(self, world, tower, block_id, target, cfg):
+    def do_turn(self, world, tower, block_id, target, cfg, probe=False):
         self.last_diag = diaglog.StepLog(world, tower, block_id, cfg)
         world.teleport_block(block_id, tower.target_pose(*target))
         self.last_diag.step("teleport", None)

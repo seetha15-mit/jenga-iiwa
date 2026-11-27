@@ -29,6 +29,7 @@ COLLAPSE_DETECTOR = "basic"  # [user] "basic" or "advanced" (the team's)
 # ------------------------------------------------------------------ blocks
 BLOCK_REAL_M = (0.075, 0.025, 0.015)  # [course] a real Jenga block: length, width, height
 BLOCK_SCALE = 1.45  # [user] ONE scale for all three dimensions (decided from the gripper numbers)
+BLOCK_COLORS = "auto"  # [user] "auto": "unique" when PERCEPTION is on, "wood" when off.  Or force one: "unique" (every block its own hue, touching blocks at least 40 deg apart; geometry.block_color), "colored" (3 colours per layer by slot, another 3 on odd layers) or "wood"
 BLOCK_GAP_M = 0.0005  # [estimate] gap between neighbouring blocks, and between layers when the tower is built (prototype value, not verified); places aim at the measured top instead (D-25)
 BLOCK_DENSITY = 700.0  # [estimate] kg/m^3; gives about 0.06 kg per block at this scale
 FRICTION_MODE = "global"  # [user] "global" (all equal) or "random" (varied, hidden from strategies)
@@ -155,14 +156,21 @@ DIAG_FIRST_BLOCK = None  # [user] development only: force the first pick to this
 
 # ------------------------------------------------------------------ sensing (notes only; the team decides)
 ENABLE_WRIST_FORCE_LOG = False  # [user] log the raw wrist force during motions
-ENABLE_CAMERAS = False  # [user] cameras are not set up; see jenga/sensing.py notes
+PERCEPTION = False  # [user] the tower bookkeeping, pull targets and place heights come from the cameras (jenga/perceive.py, sensing.estimate_block_poses) instead of the simulator's truth; turns the cameras on.  Also the push method's pushed block and the block on the pedestal, the swing check's obstacles, and the block in the hand (stage 3b: perceive.record_grasp / observe_held).  Truth is then read only to judge turns
+ENABLE_CAMERAS = False  # [user] add the two RGB-D cameras below (scene.Sim.camera_images; rendered only when asked)
+CAMERA_WIDTH_PX = 1280  # [user] image width; 0.7 mm per pixel at the tower (~0.8 m away, derived), below the 0.875 mm finger margin; near a RealSense D415 (1280x720 depth)
+CAMERA_HEIGHT_PX = 960  # [user] image height; rendering both cameras ~45 ms per call on the Mac (measured; 640x480 was 20-90 ms)
+CAMERA_FOV_Y_DEG = 45.0  # [estimate] vertical field of view
+CAMERA_BASE_EYE_M = (0.30, 0.35, 0.55)  # [estimate] "base" camera position in the robot frame R (x toward the tower, y left, z up): beside the arm, so the arm blocks less of the view; it turns with the robot
+CAMERA_TOP_HEIGHT_M = 1.0  # [estimate] "top" camera height above the table, straight above the tower centre, looking down
+CAMERA_AIM_Z_M = 0.20  # [estimate] both cameras look at the tower's axis at this height (platform 0.10 m + 6 layers about 0.13 m)
 
 # ------------------------------------------------------------------ probe before taking a block (jenga/probe.py, D-27)
 PROBE_ENABLED = False  # [user] nudge each block before the push or pull and back off if it resists; off = turns exactly as before
 PROBE_DIST_M = 0.002  # [estimate] how far the probe moves the hand (push: in; end-pinch: out); a rejected block is left up to this far out of place
 PROBE_SECONDS = 1.0  # [estimate] time for the probe move (2 mm/s, slower than PULL_INSIDE_SPEED_MS)
-PROBE_MAX_PULL_N = None  # [user] end-pinch pull: reject a block whose resistance (largest change in wrist force from the tare) is above this, in N; None = measure only, never reject. Not chosen yet: set it from probes.csv
-PROBE_MAX_PUSH_N = None  # [user] the same for a push (fingertips, no grip: a different contact from a gripped pull, so its own threshold; trial 0 read push 3.2 N, pulls 3.0-4.1 N, measured, one run)
+PROBE_MAX_PULL_N = 3.5  # [user] end-pinch pull: reject a block whose resistance (largest change in wrist force from the tare) is above this, in N; None = measure only, never reject. 
+PROBE_MAX_PUSH_N = 4.0  # [user] the same for a push (fingertips, no grip: a different contact from a gripped pull, so its own threshold; trial 0 read push 3.2 N, pulls 3.0-4.1 N, measured, one run)
 PROBE_MAX_PER_TURN = 3  # [user] rejections allowed per turn; then (or when no candidate is left) the least-resisting probed block is taken without a probe
 
 # ------------------------------------------------------------------ run_checks.py

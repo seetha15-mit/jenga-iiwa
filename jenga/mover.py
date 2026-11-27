@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from jenga import base, clearance, diaglog, executor_api  # noqa: F401  (executor_api: lazy Drake import point)
-from jenga import methods
+from jenga import methods, perceive
 from jenga import probe as probe_mod
 
 
@@ -35,7 +35,7 @@ def release_target(tower, layer, slot, poses, cfg, held=None) -> np.ndarray:
     """The slot's pose with its height set to the MEASURED top of the layer below (mean bottom face of the blocks
     there + one block height), not the built height: the tower is built with a gap between layers and settles, so
     the built height sits above the real top by more each layer (D-25).  poses: block id -> 4x4 world pose
-    (simulator truth, as for the grasp correction; a real robot would need to sense the top).  held: the block in
+    (simulator truth, or the perceived tower with config.PERCEPTION, stage 3).  held: the block in
     the hand, never counted."""
     X = np.array(tower.target_pose(layer, slot), dtype=float)
     below = [b for b in tower.layer_blocks(layer - 1) if b != held] if layer > 0 else []
@@ -121,6 +121,15 @@ class RealMover:
                 dlog.step(name, res)
             return res
 
+        def held_pose(label):  # the block in the hand: from the cameras with PERCEPTION (stage 3b), else the truth
+            return perceive.observe_held(world, cfg, block_id, label) if cfg.PERCEPTION else world.block_poses()[block_id]
+
+        def grasp(name, X_WB, plan_fn, label):  # plan a grasp on the block at X_WB, remember it, run it
+            plan = plan_fn(in_R(X_WB), cfg)
+            if cfg.PERCEPTION:  # the in-hand guess for observe_held
+                perceive.record_grasp(world, cfg, block_id, plan, in_R(X_WB))
+            do(name, ex.run_plan, world, plan, cfg.WAYPOINT_SPEED_MS, label=label)
+
         def probed(name, plan):
             """The push or pull with a probe (jenga/probe.py, D-27), as ONE straight-line motion after the plan's joint
             move: reach, probe, go_on.  The hand never stops at the block unless the probe rejects it: stopping there
@@ -153,7 +162,8 @@ class RealMover:
 
         if hasattr(method, "plan_push"):
             # ---- push (push method): from one end, the block slides part way out the far side
-            do("roll_to_push", ex.move_base_to_station, world, method.choose_station(tower, block_id, cfg, world.station))
+            k_push = method.choose_station(tower, block_id, cfg, world.station)
+            do("roll_to_push", ex.move_base_to_station, world, k_push)
             if probe:
                 probed("push", method.plan_probe(in_R(tower.block_pose(block_id)), cfg))
             else:
@@ -162,44 +172,59 @@ class RealMover:
             # ---- pull from the far end, then regrab; the block has moved, so its pose is read again
             k_pull = method.choose_pull_station(tower, block_id, cfg, world.station)
             do("roll_to_pull", ex.move_base_to_station, world, k_pull)
-            do("pull", ex.run_plan, world, method.plan_pull(in_R(world.block_poses()[block_id]), cfg),
-               cfg.WAYPOINT_SPEED_MS, label="pull")
+            if cfg.PERCEPTION:  # where the push left it, from the cameras at the pull station (stage 3b)
+                X_pushed = perceive.observe_block(world, cfg, block_id,
+                                                  perceive.pushed_guess(tower.block_pose(block_id), cfg, k_push),
+                                                  label="after the push")
+            else:
+                X_pushed = world.block_poses()[block_id]
+            grasp("pull", X_pushed, method.plan_pull, "pull")
             # ---- set it on a pedestal, then regrab it from where it actually landed (D-22); each is its own plan,
             # so each starts with a joint move (this clears the hand's drift before the regrab grasp)
             # swing to above the post; then read where the block really sits in the hand (it slides 6-15 mm down
             # the fingers during the swing) and shift the set-down by that, as for the place (D-08); then go down
-            ped = method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg)
+            ped = method.plan_ped_place(in_R(held_pose("before the pedestal swing")), cfg)
             do("pedestal", ex.run_plan, world, ped[:1], cfg.WAYPOINT_SPEED_MS, label="pedestal", held=block_id)
             if cfg.PEDESTAL_CORRECT_GRASP:
+                X_held = held_pose("above the pedestal")
                 X_T = RigidTransform(grasp_corrected_target(
                     method.pedestal_target(cfg), ped[1].X_RG, world.kin.gripper_pose(world.arm_q()),
-                    base.to_robot_frame(world.X_WR(), world.block_poses()[block_id])))
-                ped = method.plan_ped_place(in_R(world.block_poses()[block_id]), cfg, target=X_T)
+                    base.to_robot_frame(world.X_WR(), X_held)))
+                ped = method.plan_ped_place(in_R(X_held), cfg, target=X_T)
             do("pedestal_set", ex.run_waypoints, world, ped, cfg.WAYPOINT_SPEED_MS, label="pedestal set-down",
                first_index=0)
-            do("regrab", ex.run_plan, world, method.plan_regrab(in_R(world.block_poses()[block_id]), cfg),
-               cfg.WAYPOINT_SPEED_MS, label="regrab")
+            if cfg.PERCEPTION:  # where it landed on the post, from the cameras (stage 3b); outside the tower box
+                X_post = np.asarray(world.X_WR(), float) @ np.asarray(method.pedestal_target(cfg).GetAsMatrix4())
+                X_on_post = perceive.observe_block(world, cfg, block_id, X_post, crop=perceive.box_around(X_post, cfg),
+                                                   label="on the pedestal")
+            else:
+                X_on_post = world.block_poses()[block_id]
+            grasp("regrab", X_on_post, method.plan_regrab, "regrab")
         else:
             # ---- pull
             k_pull = method.choose_station(tower, block_id, cfg, world.station)
             do("roll_to_pull", ex.move_base_to_station, world, k_pull)
+            X_WB = tower.block_pose(block_id)  # perceived with PERCEPTION, else the truth
             if probe:
-                probed("pull", method.plan_probe(in_R(tower.block_pose(block_id)), cfg))
+                plan = method.plan_probe(in_R(X_WB), cfg)
+                if cfg.PERCEPTION:  # the in-hand guess for observe_held: reach + go_on is plan_pull, grasp included
+                    perceive.record_grasp(world, cfg, block_id, plan.reach + plan.go_on, in_R(X_WB))
+                probed("pull", plan)
             else:
-                do("pull", ex.run_plan, world, method.plan_pull(in_R(tower.block_pose(block_id)), cfg),
-                   cfg.WAYPOINT_SPEED_MS, label="pull")
+                grasp("pull", X_WB, method.plan_pull, "pull")
 
         # ---- place (the block stays in the hand while the base rolls)
         k_place = method.choose_place_station(tower, layer, slot, cfg, world.station)
         # no tuck before the place: the arm resets before each pull/push (O-5)
         do("roll_to_place", ex.move_base_to_station, world, k_place, tuck=False)
-        X_RT = in_R(release_target(tower, layer, slot, world.block_poses(), cfg, held=block_id))
+        poses = {b: tower.block_pose(b) for b in tower.blocks} if cfg.PERCEPTION else world.block_poses()  # perceived or truth
+        X_RT = in_R(release_target(tower, layer, slot, poses, cfg, held=block_id))
         wps = method.plan_place(X_RT, cfg)
         i = release_index(wps, cfg) if cfg.PLACE_CORRECT_GRASP else None
         if i is not None:  # aim the block, not the hand: it slides in the pads during the roll (D-08)
             X_RT = RigidTransform(grasp_corrected_target(
                 X_RT, wps[i].X_RG, world.kin.gripper_pose(world.arm_q()),
-                base.to_robot_frame(world.X_WR(), world.block_poses()[block_id])))
+                base.to_robot_frame(world.X_WR(), held_pose("before the place"))))
             wps = method.plan_place(X_RT, cfg)
         do("place", ex.run_plan, world, wps, cfg.WAYPOINT_SPEED_MS, label="place", held=block_id)
         return TurnInfo(k_pull, k_place)
