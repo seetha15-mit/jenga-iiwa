@@ -102,7 +102,7 @@ PUSH_AT_BLOCK = 2  # plan_push's first PUSH_AT_BLOCK waypoints end with the fing
 
 
 def plan_probe(X_RB, cfg):
-    """plan_push split for the probe (D-27, jenga/probe.py): fingertips to the end face, push PROBE_DIST_M in slowly,
+    """plan_push split for the probe (D-28, jenga/probe.py): fingertips to the end face, push PROBE_DIST_M in slowly,
     then either finish plan_push or back out.  Written with Claude; the push itself is plan_push's, unchanged.
 
     Inputs: X_RB, cfg as plan_push.  Returns: probe.ProbePlan(reach, probe, go_on, back_off).

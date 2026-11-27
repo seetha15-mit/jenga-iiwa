@@ -1,8 +1,8 @@
-"""Probe before taking a block (D-27): nudge it PROBE_DIST_M, read the wrist force, and back off if it resists.
+"""Probe before taking a block (D-28): nudge it PROBE_DIST_M, read the wrist force, and back off if it resists.
 
 A probed turn, run by mover.RealMover when the harness asks for a probe.  After the plan's first (joint) move,
 reach[1:] + probe + go_on run as ONE straight-line motion, so the hand does not stop at the block (stopping there and
-restarting dragged the layer below, D-27):
+restarting dragged the layer below, D-28):
     reach     the method's own waypoints up to contact (push: fingertips on the end face; end-pinch: block gripped)
     tare      the wrist-force sample as the hand reaches the end of reach: the hand's weight and any contact so far
     probe     a slow straight move of PROBE_DIST_M (push: into the tower; end-pinch: out), wrist force sampled

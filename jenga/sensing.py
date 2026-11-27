@@ -19,7 +19,7 @@ Facts (see DECISIONS.md for sources)
   * Probing with the force strategy needs motions: how a strategy commands them is open.  The executor can sample
     the force during a motion (run_waypoints force_trace) and stop at a waypoint (run_waypoints stop_at), not at
     an arbitrary instant: a check runs only as the hand reaches each waypoint.
-  * The probe (jenga/probe.py, D-27) uses both: a fixed 2 mm leg inside the push or pull, tared on the sample as
+  * The probe (jenga/probe.py, D-28) uses both: a fixed 2 mm leg inside the push or pull, tared on the sample as
     the hand reaches it (the hand's weight cancels), judged at the leg's end against config PROBE_MAX_PULL_N /
     PROBE_MAX_PUSH_N; a rejection stops the motion there.
 """

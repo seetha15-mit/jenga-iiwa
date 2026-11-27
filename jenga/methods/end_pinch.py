@@ -133,7 +133,7 @@ PULL_GRASPED = 4  # plan_pull's first PULL_GRASPED waypoints end with the block 
 
 
 def plan_probe(X_RB, cfg):
-    """plan_pull split for the probe (D-27, jenga/probe.py): grip the block, pull PROBE_DIST_M out slowly, then either
+    """plan_pull split for the probe (D-28, jenga/probe.py): grip the block, pull PROBE_DIST_M out slowly, then either
     finish plan_pull or let go and retreat.  Written with Claude; the pull itself is plan_pull's, unchanged.
 
     Inputs: X_RB, cfg as plan_pull.  Returns: probe.ProbePlan(reach, probe, go_on, back_off).

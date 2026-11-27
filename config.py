@@ -165,7 +165,7 @@ CAMERA_BASE_EYE_M = (0.30, 0.35, 0.55)  # [estimate] "base" camera position in t
 CAMERA_TOP_HEIGHT_M = 1.0  # [estimate] "top" camera height above the table, straight above the tower centre, looking down
 CAMERA_AIM_Z_M = 0.20  # [estimate] both cameras look at the tower's axis at this height (platform 0.10 m + 6 layers about 0.13 m)
 
-# ------------------------------------------------------------------ probe before taking a block (jenga/probe.py, D-27)
+# ------------------------------------------------------------------ probe before taking a block (jenga/probe.py, D-28)
 PROBE_ENABLED = False  # [user] nudge each block before the push or pull and back off if it resists; off = turns exactly as before
 PROBE_DIST_M = 0.002  # [estimate] how far the probe moves the hand (push: in; end-pinch: out); a rejected block is left up to this far out of place
 PROBE_SECONDS = 1.0  # [estimate] time for the probe move (2 mm/s, slower than PULL_INSIDE_SPEED_MS)

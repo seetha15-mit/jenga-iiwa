@@ -66,9 +66,9 @@ def run_waypoints(world, waypoints, speed: float, label: str = "", on_waypoint=N
     jenga/diaglog.py; the simulator stops there, which does not change the result: D-24, and the push sweep gave
     the same turn with and without the stops), first_index (the index of the first waypoint passed to on_waypoint),
     force_trace (a list: the raw wrist force is appended to it every SAMPLE_DT_S during the motion, for the probe,
-    D-27; None = not sampled), stop_at (function (i, waypoint) -> bool, same indices as on_waypoint, called when the
+    D-28; None = not sampled), stop_at (function (i, waypoint) -> bool, same indices as on_waypoint, called when the
     hand is due at each waypoint; True = stop the motion there: the hand holds its command, the fingers keep that
-    waypoint's opening.  The probe decides while the push or pull keeps going, D-27).
+    waypoint's opening.  The probe decides while the push or pull keeps going, D-28).
     Returns: the PhaseResult (tracking error at the last waypoint reached, joint margin, stopped_at).
     """
     cfg = world.cfg

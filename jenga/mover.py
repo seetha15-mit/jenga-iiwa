@@ -6,7 +6,7 @@ FakeMover  teleports the block to its target slot.  No arm, no physics for the m
 RealMover  runs the team's steps: rolls the base to a station, executes the method's plan_pull, rolls to a
            placing station if needed, and executes plan_place.  A method with a plan_push (the push method)
            instead runs push, pull from the opposite station, regrab, then place.  With probe=True the push (or the
-           end-pinch pull) is run as a probe first (jenga/probe.py, D-27) and the turn may end in ProbeRejected.
+           end-pinch pull) is run as a probe first (jenga/probe.py, D-28) and the turn may end in ProbeRejected.
 
 Both take a `world` (jenga.scene.Sim, or a stand-in with the same few methods in the tests).
 """
@@ -90,7 +90,7 @@ class RealMover:
 
     def do_turn(self, world, tower, block_id, target, cfg, probe=False) -> TurnInfo:
         """Carry out one turn.  probe=True: the push (push method) or the pull (end-pinch) is run as a probe first;
-        if the block resists, the hand lets go and backs off and ProbeRejected is raised (D-27)."""
+        if the block resists, the hand lets go and backs off and ProbeRejected is raised (D-28)."""
         from pydrake.all import RigidTransform  # Drake only needed on the real path
 
         ex = executor_api.get()
@@ -131,7 +131,7 @@ class RealMover:
             do(name, ex.run_plan, world, plan, cfg.WAYPOINT_SPEED_MS, label=label)
 
         def probed(name, plan):
-            """The push or pull with a probe (jenga/probe.py, D-27), as ONE straight-line motion after the plan's joint
+            """The push or pull with a probe (jenga/probe.py, D-28), as ONE straight-line motion after the plan's joint
             move: reach, probe, go_on.  The hand never stops at the block unless the probe rejects it: stopping there
             and restarting dragged the layer below (push, trial 0: 15.6 mm with a stop and no probe move, 0.24 mm with
             the probe leg in one motion; measured).  Tare = the reading as the hand reaches the probe leg; the verdict

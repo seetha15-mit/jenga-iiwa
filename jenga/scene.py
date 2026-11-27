@@ -527,7 +527,7 @@ class Sim:
 
     def advance_logged(self, seconds: float, trace=None) -> None:
         """Advance, sampling the wrist force every SAMPLE_DT_S when config.ENABLE_WRIST_FORCE_LOG is on (into the
-        trial's force log) or when `trace` is a list (each raw reading appended to it: the probe, D-27)."""
+        trial's force log) or when `trace` is a list (each raw reading appended to it: the probe, D-28)."""
         if not self.cfg.ENABLE_WRIST_FORCE_LOG and trace is None:
             self.advance(seconds)
             return

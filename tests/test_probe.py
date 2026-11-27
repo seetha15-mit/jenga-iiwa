@@ -1,4 +1,4 @@
-"""Probe before taking a block (jenga/probe.py, D-27): the force measure, the accept rule, the fallback, and the
+"""Probe before taking a block (jenga/probe.py, D-28): the force measure, the accept rule, the fallback, and the
 harness's drop-and-ask-again loop.  No physics: a stand-in mover decides which blocks resist."""
 
 import csv

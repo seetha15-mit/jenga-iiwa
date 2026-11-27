@@ -5,7 +5,7 @@ One trial = one persistent simulator.  Turn loop:
     2. candidates = legal pulls (tower rule) that the extraction method can physically take
     3. the strategy picks one (the FIRST pick of every trial is random, whatever the strategy: course rule)
     4. the mover carries out the turn (real steps, or the fake teleport).  With PROBE_ENABLED the mover probes the
-       block first (jenga/probe.py, D-27); a block that resists is dropped from this turn's candidates, the tower
+       block first (jenga/probe.py, D-28); a block that resists is dropped from this turn's candidates, the tower
        is checked for collapse, and step 3 runs again, up to PROBE_MAX_PER_TURN times; then the block that resisted
        least is taken without a probe.  Every probe is a row in probes.csv
     5. EVALUATION: classify what happened to the block (true poses), run the collapse detector
