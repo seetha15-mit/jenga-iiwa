@@ -52,14 +52,14 @@ class RealLikeMover:
     def banner(self):
         return ""
 
-    def do_turn(self, world, tower, block_id, target, cfg):
+    def do_turn(self, world, tower, block_id, target, cfg, probe=False):
         world.teleport_block(block_id, tower.target_pose(*target))
         world.hold(1.0)
         return TurnInfo()
 
 
 class DoNothingMover(RealLikeMover):
-    def do_turn(self, world, tower, block_id, target, cfg):
+    def do_turn(self, world, tower, block_id, target, cfg, probe=False):
         world.hold(1.0)
         return TurnInfo()
 
@@ -67,7 +67,7 @@ class DoNothingMover(RealLikeMover):
 class DisturbMover(RealLikeMover):
     """Moves the block to its target AND shoves another block 5 cm."""
 
-    def do_turn(self, world, tower, block_id, target, cfg):
+    def do_turn(self, world, tower, block_id, target, cfg, probe=False):
         other = next(b for b in tower.blocks if b != block_id)
         X = world.poses[other].copy()
         X[0, 3] += 0.05
@@ -76,7 +76,7 @@ class DisturbMover(RealLikeMover):
 
 
 class FailingMover(RealLikeMover):
-    def do_turn(self, world, tower, block_id, target, cfg):
+    def do_turn(self, world, tower, block_id, target, cfg, probe=False):
         from jenga.errors import MotionFailed
 
         raise MotionFailed("no IK solution (test)")

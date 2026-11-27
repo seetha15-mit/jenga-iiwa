@@ -5,7 +5,8 @@ FakeMover  teleports the block to its target slot.  No arm, no physics for the m
            Everything it produces is tagged mover = "fake" and goes to runs_fake/.  RESULTS ARE INVALID.
 RealMover  runs the team's steps: rolls the base to a station, executes the method's plan_pull, rolls to a
            placing station if needed, and executes plan_place.  A method with a plan_push (the push method)
-           instead runs push, pull from the opposite station, regrab, then place.
+           instead runs push, pull from the opposite station, regrab, then place.  With probe=True the push (or the
+           end-pinch pull) is run as a probe first (jenga/probe.py, D-28) and the turn may end in ProbeRejected.
 
 Both take a `world` (jenga.scene.Sim, or a stand-in with the same few methods in the tests).
 """
@@ -16,6 +17,7 @@ import numpy as np
 
 from jenga import base, clearance, diaglog, executor_api  # noqa: F401  (executor_api: lazy Drake import point)
 from jenga import methods, perceive
+from jenga import probe as probe_mod
 
 
 def _mat(X) -> np.ndarray:
@@ -71,8 +73,8 @@ class FakeMover:
         return (f"{bar}\n*** FAKE MOVER: blocks are TELEPORTED.  Results are INVALID and are written to "
                 f"the fake-runs folder. ***\n{bar}")
 
-    def do_turn(self, world, tower, block_id, target, cfg) -> TurnInfo:
-        layer, slot = target
+    def do_turn(self, world, tower, block_id, target, cfg, probe=False) -> TurnInfo:
+        layer, slot = target  # probe is ignored: a teleport has nothing to probe
         world.teleport_block(block_id, tower.target_pose(layer, slot))
         world.hold(1.0)  # let the tower settle so a disturbed neighbour shows up in the poses
         return TurnInfo()
@@ -81,11 +83,14 @@ class FakeMover:
 class RealMover:
     TAG = "real"
     last_diag = None  # the last turn's development log (jenga/diaglog.py), or None when it is off
+    last_probe = None  # the last turn's probe (dict for probes.csv), or None when it did not probe
 
     def banner(self) -> str:
         return ""
 
-    def do_turn(self, world, tower, block_id, target, cfg) -> TurnInfo:
+    def do_turn(self, world, tower, block_id, target, cfg, probe=False) -> TurnInfo:
+        """Carry out one turn.  probe=True: the push (push method) or the pull (end-pinch) is run as a probe first;
+        if the block resists, the hand lets go and backs off and ProbeRejected is raised (D-28)."""
         from pydrake.all import RigidTransform  # Drake only needed on the real path
 
         ex = executor_api.get()
@@ -99,6 +104,7 @@ class RealMover:
 
         dlog = diaglog.StepLog(world, tower, block_id, cfg) if cfg.DIAG_LOG_LEVEL > 0 else None
         self.last_diag = dlog  # the harness writes its rows (steps.csv), also after a failed motion
+        self.last_probe = None
 
         def do(name, fn, *args, **kw):  # run one step; with the development log on, record what it did
             if dlog:
@@ -124,12 +130,45 @@ class RealMover:
                 perceive.record_grasp(world, cfg, block_id, plan, in_R(X_WB))
             do(name, ex.run_plan, world, plan, cfg.WAYPOINT_SPEED_MS, label=label)
 
+        def probed(name, plan):
+            """The push or pull with a probe (jenga/probe.py, D-28), as ONE straight-line motion after the plan's joint
+            move: reach, probe, go_on.  The hand never stops at the block unless the probe rejects it: stopping there
+            and restarting dragged the layer below (push, trial 0: 15.6 mm with a stop and no probe move, 0.24 mm with
+            the probe leg in one motion; measured).  Tare = the reading as the hand reaches the probe leg; the verdict
+            is taken as it reaches the probe leg's end; a rejection stops the motion there and backs off."""
+            do(f"{name}_start", ex.run_plan, world, plan.reach[:1], cfg.WAYPOINT_SPEED_MS, label=f"{name}: start")
+            trace, n_reach, n_probe = [], len(plan.reach), len(plan.probe)
+            window = dict(tare=world.wrist_force_raw(), first=0, r=0.0, ok=True)  # tare here if reach is one waypoint
+
+            def stop_at(i, w):  # i: index in plan.reach + plan.probe + plan.go_on
+                if i == n_reach - 1:  # at the block: the probe leg starts
+                    window.update(tare=trace[-1] if trace else world.wrist_force_raw(), first=len(trace))
+                if i == n_reach + n_probe - 1:  # the probe leg's end: decide
+                    window["r"] = probe_mod.resistance(trace[window["first"]:], window["tare"])
+                    window["ok"] = probe_mod.accept(window["r"], cfg, name)
+                    self.last_probe = dict(block_id=block_id, layer=tower.blocks[block_id].layer,
+                                           slot=tower.blocks[block_id].slot, step=name, station=world.station,
+                                           resistance_n=round(window["r"], 3), samples=len(trace) - window["first"],
+                                           accepted=window["ok"])
+                    return not window["ok"]
+                return False
+
+            do(name, ex.run_waypoints, world, plan.reach[1:] + plan.probe + plan.go_on, cfg.WAYPOINT_SPEED_MS,
+               label=name, force_trace=trace, stop_at=stop_at)
+            if not window["ok"]:
+                do(f"{name}_back_off", ex.run_waypoints, world, plan.back_off, cfg.WAYPOINT_SPEED_MS,
+                   label=f"{name} probe: back off")
+                raise probe_mod.ProbeRejected(block_id, window["r"])
+
         if hasattr(method, "plan_push"):
             # ---- push (push method): from one end, the block slides part way out the far side
             k_push = method.choose_station(tower, block_id, cfg, world.station)
             do("roll_to_push", ex.move_base_to_station, world, k_push)
-            do("push", ex.run_plan, world, method.plan_push(in_R(tower.block_pose(block_id)), cfg), cfg.WAYPOINT_SPEED_MS,
-               label="push")
+            if probe:
+                probed("push", method.plan_probe(in_R(tower.block_pose(block_id)), cfg))
+            else:
+                do("push", ex.run_plan, world, method.plan_push(in_R(tower.block_pose(block_id)), cfg),
+                   cfg.WAYPOINT_SPEED_MS, label="push")
             # ---- pull from the far end, then regrab; the block has moved, so its pose is read again
             k_pull = method.choose_pull_station(tower, block_id, cfg, world.station)
             do("roll_to_pull", ex.move_base_to_station, world, k_pull)
@@ -165,7 +204,14 @@ class RealMover:
             # ---- pull
             k_pull = method.choose_station(tower, block_id, cfg, world.station)
             do("roll_to_pull", ex.move_base_to_station, world, k_pull)
-            grasp("pull", tower.block_pose(block_id), method.plan_pull, "pull")
+            X_WB = tower.block_pose(block_id)  # perceived with PERCEPTION, else the truth
+            if probe:
+                plan = method.plan_probe(in_R(X_WB), cfg)
+                if cfg.PERCEPTION:  # the in-hand guess for observe_held: reach + go_on is plan_pull, grasp included
+                    perceive.record_grasp(world, cfg, block_id, plan.reach + plan.go_on, in_R(X_WB))
+                probed("pull", plan)
+            else:
+                grasp("pull", X_WB, method.plan_pull, "pull")
 
         # ---- place (the block stays in the hand while the base rolls)
         k_place = method.choose_place_station(tower, layer, slot, cfg, world.station)

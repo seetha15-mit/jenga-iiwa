@@ -125,8 +125,32 @@ def plan_pull(X_RB, cfg):
     wayplist.append(Waypoint(pickpounce, L-2*cfg.FINGER_SQUEEZE_M,0.1))   # 4. retreat holding it
     wayplist.append(Waypoint(pickpounce@upoffset,L-2*cfg.FINGER_SQUEEZE_M))
     return wayplist
-    
+
     # ---- END CODE TO BE WRITTEN ----
+
+
+PULL_GRASPED = 4  # plan_pull's first PULL_GRASPED waypoints end with the block gripped in its slot; keep in step with plan_pull
+
+
+def plan_probe(X_RB, cfg):
+    """plan_pull split for the probe (D-28, jenga/probe.py): grip the block, pull PROBE_DIST_M out slowly, then either
+    finish plan_pull or let go and retreat.  Written with Claude; the pull itself is plan_pull's, unchanged.
+
+    Inputs: X_RB, cfg as plan_pull.  Returns: probe.ProbePlan(reach, probe, go_on, back_off).
+    reach = plan_pull up to the grasp; probe = the same pose moved PROBE_DIST_M back along G y (out of the tower,
+    plan_pull's own pull direction) in PROBE_SECONDS, still gripping; go_on = the rest of plan_pull; back_off =
+    open the fingers at the probed pose (0.5 s, still), back to plan_pull's start pose, then its last pose, open."""
+    from pydrake.all import RigidTransform
+    from jenga.probe import ProbePlan
+    wps = plan_pull(X_RB, cfg)
+    reach, go_on = wps[:PULL_GRASPED], wps[PULL_GRASPED:]
+    grasped = reach[-1]
+    out = grasped.X_RG @ RigidTransform([0, -cfg.PROBE_DIST_M, 0])
+    probe = [Waypoint(out, grasped.opening, cfg.PROBE_SECONDS)]
+    back_off = [Waypoint(out, cfg.FINGER_OPEN_COMMAND_M, 0.5),
+                Waypoint(wps[0].X_RG, cfg.FINGER_OPEN_COMMAND_M),
+                Waypoint(wps[-1].X_RG, cfg.FINGER_OPEN_COMMAND_M)]
+    return ProbePlan(reach, probe, go_on, back_off)
 
 
 def plan_place(X_RT, cfg):
