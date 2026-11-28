@@ -172,6 +172,7 @@ PROBE_SECONDS = 1.0  # [estimate] time for the probe move (2 mm/s, slower than P
 PROBE_MAX_PULL_N = 3.5  # [user] end-pinch pull: reject a block whose resistance (largest change in wrist force from the tare) is above this, in N; None = measure only, never reject. 
 PROBE_MAX_PUSH_N = 4.0  # [user] the same for a push (fingertips, no grip: a different contact from a gripped pull, so its own threshold; trial 0 read push 3.2 N, pulls 3.0-4.1 N, measured, one run)
 PROBE_END_PULLS = True  # [user] also probe end-pinch pulls; False = probe pushes only (edges are pulled unprobed)
+PROBE_EDGE_PUSH = False  # [user] probe an edge block with a fingertip push along its length from an end face (push.plan_probe, always backed out), then pull it unprobed; False = the gripped pull probe
 PROBE_MAX_PER_TURN = 3  # [user] rejections allowed per turn; then (or when no candidate is left) the least-resisting probed block is taken without a probe
 
 # ------------------------------------------------------------------ run_checks.py
