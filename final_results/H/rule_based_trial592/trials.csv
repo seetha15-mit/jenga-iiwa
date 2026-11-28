@@ -1,0 +1,2 @@
+trial,seed,strategy,extraction_method,mover,friction_mode,perception,probe,n_layers_start,block_scale,contact_model,turns_attempted,blocks_replaced,collapsed,end_reason,collapse_reason,first_block,arm_collisions_unchecked,sim_seconds,wall_seconds,replay_file
+592,1592,rule_based,mixed,real,random,False,True,6,1.45,hydroelastic,3,2,True,collapse,block 8 moved 366.0 mm,0,True,123.8,482.6,

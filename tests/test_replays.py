@@ -49,6 +49,12 @@ class TestPick(unittest.TestCase):
             write_condition(Path(tmp) / "replays", "A", "random", {500: 3})
             self.assertEqual(replays.to_submit(Path(tmp)), {"A": [501], "E": [500]})
 
+    def test_replay_path_is_relative_to_where_the_run_is_now(self):
+        rerun = {"replay_file": "/old/place/replays/H/rule_based_trial512/trial_512_replay.html"}
+        self.assertEqual(replays.replay_path(Path("/new"), "H", 512, rerun),
+                         "replays/H/rule_based_trial512/trial_512_replay.html")
+        self.assertEqual(replays.replay_path(Path("/new"), "H", 512, None), "")
+
     def test_command_carries_the_conditions_settings(self):
         cmd = replays.command("H", 512, "/out")
         for s in ("--strategy rule_based", "--trial 512", "--replay", "FRICTION_MODE='random'", "PROBE_EDGE_PUSH=True"):

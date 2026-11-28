@@ -1,0 +1,45 @@
+condition,trial,reasons
+A,500,A typical
+A,504,A worst
+A,512,A best
+A,517,M1 (B vs A) gained most (+7)
+A,547,M1 (B vs A) lost most (-2)
+B,500,B typical
+B,512,B best
+B,517,M1 (B vs A) gained most (+7)
+B,522,M2 (C vs B) gained most (+4)
+B,545,B worst
+B,547,M1 (B vs A) lost most (-2)
+B,581,M2 (C vs B) lost most (-3)
+C,500,C typical
+C,502,C best
+C,522,M2 (C vs B) gained most (+4)
+C,545,C worst
+C,581,M2 (C vs B) lost most (-3)
+D,500,D best
+D,501,D typical
+D,544,M3 (E vs D) lost most (-3)
+D,545,S1 (H vs D) gained most (+6)
+D,553,M3 (E vs D) gained most (+4)
+D,570,D worst
+D,583,S1 (H vs D) lost most (-5)
+E,500,E best
+E,501,E typical
+E,544,M3 (E vs D) lost most (-3)
+E,553,M3 (E vs D) gained most (+4)
+E,570,E worst
+F,500,F typical
+F,552,F worst
+F,558,F best
+F,589,M4 (G vs F) gained most (+4)
+F,591,M4 (G vs F) lost most (-4)
+G,500,G typical
+G,520,G worst
+G,558,G best
+G,589,M4 (G vs F) gained most (+4)
+G,591,M4 (G vs F) lost most (-4)
+H,506,H typical
+H,545,S1 (H vs D) gained most (+6)
+H,560,H best
+H,570,H worst
+H,583,S1 (H vs D) lost most (-5)

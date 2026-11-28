@@ -1,0 +1,7 @@
+trial,turn,block_id,step,waypoint,sim_t,step_s,error,block_along_mm,block_side_mm,block_up_mm,block_yaw_deg,block_tilt_deg,worst_id,worst_layer,worst_mm,worst_tilt_deg,same_layer_mm,above_mm,below_mm,other_layers_mm,worst_since_turn_mm,tracking_mm,in_hand_x_mm,in_hand_y_mm,in_hand_z_mm,err_x_mm,err_y_mm,err_z_mm,opening_cmd_mm,joint_margin_deg,q1_deg,q2_deg,q3_deg,q4_deg,q5_deg,q6_deg,q7_deg,swing_tried,swing_options,swing_clear_mm,swing_nearest
+584,0,10,roll_to_push,,1.0,0.0,,0.0,0.0,0.0,-0.0,0.0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,,0.0,179.93,-452.68,,,,,28.3,-0.0,22.9,-0.0,-91.7,0.0,68.8,0.0,,,,
+584,0,10,push_start,,6.0,5.0,,0.0,0.0,-0.0,0.0,0.0,2,0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-53.92,272.66,9.66,,,,,24.2,6.9,60.0,-1.0,-95.8,7.0,-65.8,-2.0,1,14,86.3,pedestal_1
+584,0,10,push,,15.86,9.86,,41.94,0.64,-0.02,0.97,0.02,14,4,5.23,0.02,0.29,5.23,0.2,0.42,5.23,4.65,-53.09,319.44,309.85,,,,,21.8,7.8,25.9,-2.2,-98.2,10.2,-34.3,-7.5,,,,
+584,0,10,roll_to_pull,,24.01,8.15,,41.94,0.63,-0.02,0.97,0.02,14,4,0.0,0.0,0.0,0.0,0.0,0.0,5.23,,-0.64,182.43,-410.81,,,,,28.3,0.0,22.9,0.0,-91.7,-0.0,68.8,-0.0,,,,
+584,0,10,pull,,40.38,16.37,,242.03,6.0,30.16,2.47,0.81,14,4,201.41,0.96,0.61,201.41,0.18,1.08,206.58,3.04,0.06,151.75,12.47,,,,,1.4,-117.7,-113.7,-81.2,118.6,22.4,58.3,-85.6,1,14,27.1,pedestal_3
+584,0,10,pedestal,,40.38,0.0,pedestal: first waypoint: none of 14 IK solutions has a swing clear by 10 mm (best 9.0 mm from block_14),242.03,6.0,30.16,2.47,0.81,0,0,0.0,0.0,0.0,0.0,0.0,0.0,206.58,,0.06,151.75,12.47,,,,,1.4,-117.7,-113.7,-81.2,118.6,22.4,58.3,-85.6,,,,

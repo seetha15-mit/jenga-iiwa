@@ -1,0 +1,3 @@
+DIAG_LOG_LEVEL = 1
+FRICTION_MODE = 'random'
+PROBE_ENABLED = True

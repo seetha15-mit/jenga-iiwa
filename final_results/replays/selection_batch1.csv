@@ -1,0 +1,21 @@
+condition,trial,reasons
+A,500,A typical
+A,504,A worst
+A,512,A best
+A,517,M1 (B vs A) gained most (+7)
+A,547,M1 (B vs A) lost most (-2)
+B,500,B typical
+B,512,B best
+B,517,M1 (B vs A) gained most (+7)
+B,522,M2 (C vs B) gained most (+4)
+B,545,B worst
+B,547,M1 (B vs A) lost most (-2)
+B,581,M2 (C vs B) lost most (-3)
+C,500,C typical
+C,502,C best
+C,522,M2 (C vs B) gained most (+4)
+C,545,C worst
+C,581,M2 (C vs B) lost most (-3)
+D,500,D best
+D,501,D typical
+D,570,D worst

@@ -1,0 +1,4 @@
+trial,seed,strategy,extraction_method,mover,friction_mode,n_layers_start,block_scale,contact_model,turn,block_id,layer,slot,target_layer,target_slot,station_pull,station_place,outcome,collapse,collapse_reason,mover_error,arm_collisions_unchecked,sim_seconds,wall_seconds,place_across_mm,place_along_mm,place_height_mm,probes_rejected,perception_unseen,perception_max_height_mm,perception_max_pos_mm
+563,1563,random,mixed,real,random,6,1.45,hydroelastic,0,12,4,0,6,0,0,0,replaced,False,,,True,16.92,56.5,1.09,-0.0,-0.2,0,,,
+563,1563,random,mixed,real,random,6,1.45,hydroelastic,1,7,2,1,6,1,3,0,replaced,False,,,True,83.14,228.7,0.24,-0.66,0.02,0,,,
+563,1563,random,mixed,real,random,6,1.45,hydroelastic,2,8,2,2,6,2,2,2,collapse,True,block 7 moved 30.1 mm,,True,27.1,70.6,-62.21,-36.25,-222.31,0,,,

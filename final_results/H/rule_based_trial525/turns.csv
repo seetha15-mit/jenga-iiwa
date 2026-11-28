@@ -1,0 +1,9 @@
+trial,seed,strategy,extraction_method,mover,friction_mode,n_layers_start,block_scale,contact_model,turn,block_id,layer,slot,target_layer,target_slot,station_pull,station_place,outcome,collapse,collapse_reason,mover_error,arm_collisions_unchecked,sim_seconds,wall_seconds,place_across_mm,place_along_mm,place_height_mm,probes_rejected,perception_unseen,perception_max_height_mm,perception_max_pos_mm
+525,1525,rule_based,mixed,real,random,6,1.45,hydroelastic,0,1,0,1,6,0,,,dropped,False,,regrab: first waypoint: no IK solution for the hand pose (is it reachable from this station?),True,56.3,249.6,-344.09,187.5,-208.62,0,,,
+525,1525,rule_based,mixed,real,random,6,1.45,hydroelastic,1,4,1,1,6,0,2,0,replaced,False,,,True,79.42,330.7,0.91,-0.93,-0.02,0,,,
+525,1525,rule_based,mixed,real,random,6,1.45,hydroelastic,2,9,3,0,6,1,1,0,replaced,False,,,True,35.32,137.0,0.17,3.2,0.0,0,,,
+525,1525,rule_based,mixed,real,random,6,1.45,hydroelastic,3,6,2,0,6,2,0,2,replaced,False,,,True,46.58,168.9,-1.13,-0.01,0.14,0,,,
+525,1525,rule_based,mixed,real,random,6,1.45,hydroelastic,4,14,4,2,7,0,2,1,replaced,False,,,True,44.44,154.2,-1.57,-0.14,-0.3,0,,,
+525,1525,rule_based,mixed,real,random,6,1.45,hydroelastic,5,8,2,2,7,1,2,1,replaced,False,,,True,35.91,114.3,-1.2,-0.07,-0.05,0,,,
+525,1525,rule_based,mixed,real,random,6,1.45,hydroelastic,6,11,3,2,7,2,3,3,replaced,False,,,True,42.05,131.4,1.49,-0.16,-0.02,0,,,
+525,1525,rule_based,mixed,real,random,6,1.45,hydroelastic,7,15,5,0,8,0,1,0,collapse,True,block 17 moved 317.5 mm,,True,44.63,128.2,36.14,-14.07,-7.18,0,,,

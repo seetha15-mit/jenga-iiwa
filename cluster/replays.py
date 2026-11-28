@@ -106,6 +106,14 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16] if Path(path).exists() else ""
 
 
+def replay_path(root: Path, letter: str, trial: int, rerun) -> str:
+    """The rerun's replay file relative to <root>, where it is now (trials.csv records where it was made)."""
+    if not rerun or not rerun["replay_file"]:
+        return ""
+    folder = f"{fc.CONDITIONS[letter]['strategy']}_trial{trial}"
+    return str(Path("replays") / letter / folder / Path(rerun["replay_file"]).name)
+
+
 def verify(root: Path) -> int:
     """Compare every rerun with its original (blocks, end, collapse) and write the manifest.  Returns the number of
     reruns that do not match or are missing (they do not count, FINAL_RUN.md)."""
@@ -125,7 +133,7 @@ def verify(root: Path) -> int:
                         command=command(L, t, str(root / "replays" / L)),
                         blocks_original=orig["blocks_replaced"] if orig else "",
                         blocks_rerun=rerun["blocks_replaced"] if rerun else "", matches=same,
-                        replay_file=rerun["replay_file"] if rerun else ""))
+                        replay_file=replay_path(root, L, t, rerun)))
     path = root / "replays" / "replays.csv"
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(out[0]))

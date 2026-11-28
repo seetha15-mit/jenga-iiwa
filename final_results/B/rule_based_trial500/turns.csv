@@ -1,0 +1,8 @@
+trial,seed,strategy,extraction_method,mover,friction_mode,n_layers_start,block_scale,contact_model,turn,block_id,layer,slot,target_layer,target_slot,station_pull,station_place,outcome,collapse,collapse_reason,mover_error,arm_collisions_unchecked,sim_seconds,wall_seconds,place_across_mm,place_along_mm,place_height_mm,probes_rejected,perception_unseen,perception_max_height_mm,perception_max_pos_mm
+500,1500,rule_based,mixed,real,global,6,1.45,hydroelastic,0,1,0,1,6,0,3,0,replaced,False,,,True,73.39,255.0,0.89,-0.92,-0.02,0,,,
+500,1500,rule_based,mixed,real,global,6,1.45,hydroelastic,1,4,1,1,6,1,2,0,replaced,False,,,True,77.93,251.5,0.81,-0.93,-0.0,0,,,
+500,1500,rule_based,mixed,real,global,6,1.45,hydroelastic,2,7,2,1,6,2,3,2,replaced,False,,,True,76.6,237.1,-1.03,1.19,-0.0,0,,,
+500,1500,rule_based,mixed,real,global,6,1.45,hydroelastic,3,12,4,0,7,0,0,1,replaced,False,,,True,27.49,80.1,-1.25,-0.02,-0.03,0,,,
+500,1500,rule_based,mixed,real,global,6,1.45,hydroelastic,4,9,3,0,7,1,1,1,replaced,False,,,True,14.08,38.8,-1.05,0.01,-0.0,0,,,
+500,1500,rule_based,mixed,real,global,6,1.45,hydroelastic,5,14,4,2,7,2,2,3,replaced,False,,,True,25.2,67.5,1.37,-0.02,0.15,0,,,
+500,1500,rule_based,mixed,real,global,6,1.45,hydroelastic,6,17,5,2,8,0,3,0,collapse,True,block 11 moved 316.2 mm,,True,16.5,37.3,-1.37,-228.42,-27.9,0,,,

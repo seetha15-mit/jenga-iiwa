@@ -1,0 +1,4 @@
+trial,seed,strategy,extraction_method,mover,friction_mode,n_layers_start,block_scale,contact_model,turn,block_id,layer,slot,target_layer,target_slot,station_pull,station_place,outcome,collapse,collapse_reason,mover_error,arm_collisions_unchecked,sim_seconds,wall_seconds,place_across_mm,place_along_mm,place_height_mm,probes_rejected,perception_unseen,perception_max_height_mm,perception_max_pos_mm
+568,1568,random,mixed,real,global,6,1.45,hydroelastic,0,3,1,0,6,0,1,0,replaced,False,,,True,22.78,78.7,1.23,-0.05,-0.02,0,,,
+568,1568,random,mixed,real,global,6,1.45,hydroelastic,1,0,0,0,6,1,0,0,replaced,False,,,True,18.01,59.3,1.21,0.54,0.0,0,,,
+568,1568,random,mixed,real,global,6,1.45,hydroelastic,2,1,0,1,6,2,,,collapse,True,block 15 moved 385.2 mm,pull: first waypoint: no IK solution for the hand pose (is it reachable from this station?),True,31.19,70.6,-13.55,72.63,-41.66,0,,,

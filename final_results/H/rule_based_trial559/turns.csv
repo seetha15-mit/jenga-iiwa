@@ -1,0 +1,9 @@
+trial,seed,strategy,extraction_method,mover,friction_mode,n_layers_start,block_scale,contact_model,turn,block_id,layer,slot,target_layer,target_slot,station_pull,station_place,outcome,collapse,collapse_reason,mover_error,arm_collisions_unchecked,sim_seconds,wall_seconds,place_across_mm,place_along_mm,place_height_mm,probes_rejected,perception_unseen,perception_max_height_mm,perception_max_pos_mm
+559,1559,rule_based,mixed,real,random,6,1.45,hydroelastic,0,4,1,1,6,0,2,0,replaced,False,,,True,65.98,219.1,0.77,-0.62,-0.02,0,,,
+559,1559,rule_based,mixed,real,random,6,1.45,hydroelastic,1,9,3,0,6,1,1,0,replaced,False,,,True,35.42,109.1,1.07,-0.01,-0.0,0,,,
+559,1559,rule_based,mixed,real,random,6,1.45,hydroelastic,2,6,2,0,6,2,0,2,replaced,False,,,True,46.59,132.7,-1.27,-0.05,0.14,0,,,
+559,1559,rule_based,mixed,real,random,6,1.45,hydroelastic,3,14,4,2,7,0,2,1,replaced,False,,,True,44.42,119.4,-0.73,-0.15,-0.29,0,,,
+559,1559,rule_based,mixed,real,random,6,1.45,hydroelastic,4,8,2,2,7,1,2,1,replaced,False,,,True,35.88,90.6,-0.87,-0.06,-0.0,0,,,
+559,1559,rule_based,mixed,real,random,6,1.45,hydroelastic,5,11,3,2,7,2,3,3,replaced,False,,,True,42.08,103.6,1.28,-0.11,0.02,0,,,
+559,1559,rule_based,mixed,real,random,6,1.45,hydroelastic,6,2,0,2,8,0,2,0,replaced,False,,,True,43.7,114.0,2.13,0.01,-0.33,0,,,
+559,1559,rule_based,mixed,real,random,6,1.45,hydroelastic,7,0,0,0,8,1,,,collapse,True,block 14 moved 359.2 mm,place: first waypoint: none of 9 IK solutions has a swing clear by 10 mm (best 9.8 mm from block_2),True,36.09,85.9,147.27,0.8,290.43,0,,,

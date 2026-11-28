@@ -1,0 +1,4 @@
+trial,turn,block_id,layer,slot,step,station,resistance_n,samples,accepted,max_force_n
+540,0,4,1,1,push,0,3.171,5,True,5.1
+540,1,7,2,1,push,1,4.067,5,True,5.1
+540,2,10,3,1,push,0,2.255,5,True,5.1

@@ -1,0 +1,5 @@
+trial,seed,strategy,extraction_method,mover,friction_mode,n_layers_start,block_scale,contact_model,turn,block_id,layer,slot,target_layer,target_slot,station_pull,station_place,outcome,collapse,collapse_reason,mover_error,arm_collisions_unchecked,sim_seconds,wall_seconds,place_across_mm,place_along_mm,place_height_mm,probes_rejected,perception_unseen,perception_max_height_mm,perception_max_pos_mm
+562,1562,rule_based,mixed,real,random,6,1.45,hydroelastic,0,0,0,0,6,0,0,0,replaced,False,,,True,17.24,58.1,1.32,0.0,-0.34,0,,,
+562,1562,rule_based,mixed,real,random,6,1.45,hydroelastic,1,8,2,2,6,1,2,0,replaced,False,,,True,29.55,92.6,1.07,-0.0,-0.01,0,,,
+562,1562,rule_based,mixed,real,random,6,1.45,hydroelastic,2,5,1,2,6,2,3,2,replaced,False,,,True,25.51,72.5,-1.93,0.09,0.26,0,,,
+562,1562,rule_based,mixed,real,random,6,1.45,hydroelastic,3,10,3,1,7,0,,,collapse,True,block 5 moved 438.2 mm,pedestal: first waypoint: none of 13 IK solutions has a swing clear by 10 mm (best 8.4 mm from block_9),True,32.74,48.8,-45.22,-152.8,10.86,0,,,
