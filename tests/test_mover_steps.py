@@ -153,6 +153,14 @@ class TestRealMoverSteps(unittest.TestCase):
         log, _ = self.run_turn(cfg, push, 1, place_station=1, probe=True, force=force)
         self.assertEqual([step for step, _ in log if not step.startswith("base")][:3], ["push: start", "push", "pull"])
 
+    def test_probe_end_pulls_off_probes_pushes_only(self):
+        cfg = make_cfg(EXTRACTION_METHOD="mixed", PROBE_END_PULLS=False)
+        log, _ = self.run_turn(cfg, end_pinch, 0, place_station=1, probe=True)
+        self.assertEqual([step for step, _ in log if not step.startswith("base")], ["pull", "place"])
+        self.assertIsNone(self.mover.last_probe)
+        log, _ = self.run_turn(cfg, push, 1, place_station=1, probe=True)
+        self.assertEqual([step for step, _ in log if not step.startswith("base")][:2], ["push: start", "push"])
+
     def test_with_perception_a_probed_pull_records_its_grasp_for_the_in_hand_view(self):
         from jenga import perceive
         cfg = make_cfg(EXTRACTION_METHOD="end_pinch", PERCEPTION=True)

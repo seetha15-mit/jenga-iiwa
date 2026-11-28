@@ -205,7 +205,7 @@ class RealMover:
             k_pull = method.choose_station(tower, block_id, cfg, world.station)
             do("roll_to_pull", ex.move_base_to_station, world, k_pull)
             X_WB = tower.block_pose(block_id)  # perceived with PERCEPTION, else the truth
-            if probe:
+            if probe and cfg.PROBE_END_PULLS:
                 plan = method.plan_probe(in_R(X_WB), cfg)
                 if cfg.PERCEPTION:  # the in-hand guess for observe_held: reach + go_on is plan_pull, grasp included
                     perceive.record_grasp(world, cfg, block_id, plan.reach + plan.go_on, in_R(X_WB))
