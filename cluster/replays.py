@@ -77,11 +77,22 @@ def command(letter: str, trial: int, out_root: str) -> str:
             f"--out-root {out_root} --replay --set {fc.set_args(letter)}")
 
 
-def submit(root: Path) -> None:
-    """One Slurm array per condition over its chosen trials, replays on, into <root>/replays/<letter>."""
+def to_submit(root: Path) -> dict:
+    """{letter: [trial]} chosen but not yet replayed (no trials.csv in <root>/replays/<letter>), so the second
+    batch's submit does not rerun the first batch's replays.  Wait for submitted replays to finish first."""
     sel = list(csv.DictReader(open(root / "replays" / "selection.csv")))
-    for L in sorted({r["condition"] for r in sel}):
-        trials = ",".join(r["trial"] for r in sel if r["condition"] == L)
+    out = {}
+    for r in sel:
+        L, t = r["condition"], int(r["trial"])
+        if t not in read_blocks(root / "replays" / L):
+            out.setdefault(L, []).append(t)
+    return out
+
+
+def submit(root: Path) -> None:
+    """One Slurm array per condition over its chosen trials not yet replayed, replays on, into <root>/replays/<L>."""
+    for L, ts in sorted(to_submit(root).items()):
+        trials = ",".join(str(t) for t in ts)
         out = root / "replays" / L
         out.mkdir(parents=True, exist_ok=True)
         env = dict(os.environ, OUT_ROOT=str(out), STRATEGY=fc.CONDITIONS[L]["strategy"], REPLAY="1",

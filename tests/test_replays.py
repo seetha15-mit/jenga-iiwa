@@ -41,6 +41,14 @@ class TestPick(unittest.TestCase):
             self.assertIn("M1 (B vs A) gained most (+5)", reasons[("A", 0)])
             self.assertIn("M1 (B vs A) gained most (+5)", reasons[("B", 0)])
 
+    def test_submit_skips_games_already_replayed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "replays").mkdir()
+            with open(Path(tmp) / "replays" / "selection.csv", "w", newline="") as f:
+                f.write("condition,trial,reasons\nA,500,x\nA,501,x\nE,500,x\n")
+            write_condition(Path(tmp) / "replays", "A", "random", {500: 3})
+            self.assertEqual(replays.to_submit(Path(tmp)), {"A": [501], "E": [500]})
+
     def test_command_carries_the_conditions_settings(self):
         cmd = replays.command("H", 512, "/out")
         for s in ("--strategy rule_based", "--trial 512", "--replay", "FRICTION_MODE='random'", "PROBE_EDGE_PUSH=True"):
