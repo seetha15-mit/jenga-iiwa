@@ -121,7 +121,7 @@ exactly the same: a marginal grasp can go the other way.  Check the result
 against blocks_replaced (step 4).
 
 1. Get the code at the exact version:
-       git clone <our repo> jenga-iiwa-replays
+       git clone https://github.com/seetha15-mit/jenga-iiwa.git jenga-iiwa-replays
        cd jenga-iiwa-replays
        git checkout 7345e58
 2. Put jenga.sif in that folder.  The final run's container was
