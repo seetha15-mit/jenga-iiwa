@@ -51,10 +51,11 @@ def resistance(trace, tare) -> float:
 
 
 def max_force(cfg, step: str):
-    """The rejection threshold for this probe step, in N, or None (never reject): PROBE_MAX_PULL_N for an end-pinch
-    pull, PROBE_MAX_PUSH_N for a push.  Two settings because the contacts differ (a gripped pull, a fingertip push),
-    so one number could end up choosing by method, not by load."""
-    return cfg.PROBE_MAX_PULL_N if step == "pull" else cfg.PROBE_MAX_PUSH_N
+    """The rejection threshold for this probe step, in N, or None (never reject): PROBE_MAX_PUSH_N for a middle
+    block's push ("push"), PROBE_MAX_PULL_N for an edge block's probe (an end-pinch pull, "pull", or with
+    PROBE_EDGE_PUSH a fingertip push along it, "edge_push").  Two settings because the contacts and loads differ
+    (edge pushes read about 2.1 N, middle pushes about 3.1 N), so one number would end up choosing by kind of block."""
+    return cfg.PROBE_MAX_PUSH_N if step == "push" else cfg.PROBE_MAX_PULL_N
 
 
 def accept(resistance_n: float, cfg, step: str) -> bool:

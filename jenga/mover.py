@@ -17,6 +17,7 @@ import numpy as np
 
 from jenga import base, clearance, diaglog, executor_api  # noqa: F401  (executor_api: lazy Drake import point)
 from jenga import methods, perceive
+from jenga.methods import push as push_mod
 from jenga import probe as probe_mod
 
 
@@ -202,10 +203,20 @@ class RealMover:
             grasp("regrab", X_on_post, method.plan_regrab, "regrab")
         else:
             # ---- pull
+            edge_push = probe and cfg.PROBE_END_PULLS and cfg.PROBE_EDGE_PUSH
+            if edge_push:  # probe by a fingertip push along the block from an end face, then back out (go_on = back_off)
+                do("roll_to_probe", ex.move_base_to_station, world,
+                   push_mod.choose_station(tower, block_id, cfg, world.station))
+                plan = push_mod.plan_probe(in_R(tower.block_pose(block_id)), cfg)
+                probed("edge_push", plan._replace(go_on=plan.back_off))
             k_pull = method.choose_station(tower, block_id, cfg, world.station)
             do("roll_to_pull", ex.move_base_to_station, world, k_pull)
             X_WB = tower.block_pose(block_id)  # perceived with PERCEPTION, else the truth
-            if probe:
+            if edge_push:  # the probe moved the block up to PROBE_DIST_M along its length: where is it now
+                X_WB = (perceive.observe_block(world, cfg, block_id, X_WB, crop=perceive.box_around(X_WB, cfg),
+                                               label="after the probe") if cfg.PERCEPTION else world.block_poses()[block_id])
+                grasp("pull", X_WB, method.plan_pull, "pull")
+            elif probe and cfg.PROBE_END_PULLS:
                 plan = method.plan_probe(in_R(X_WB), cfg)
                 if cfg.PERCEPTION:  # the in-hand guess for observe_held: reach + go_on is plan_pull, grasp included
                     perceive.record_grasp(world, cfg, block_id, plan.reach + plan.go_on, in_R(X_WB))

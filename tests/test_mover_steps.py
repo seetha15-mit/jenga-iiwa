@@ -153,6 +153,27 @@ class TestRealMoverSteps(unittest.TestCase):
         log, _ = self.run_turn(cfg, push, 1, place_station=1, probe=True, force=force)
         self.assertEqual([step for step, _ in log if not step.startswith("base")][:3], ["push: start", "push", "pull"])
 
+    def test_probe_end_pulls_off_probes_pushes_only(self):
+        cfg = make_cfg(EXTRACTION_METHOD="mixed", PROBE_END_PULLS=False)
+        log, _ = self.run_turn(cfg, end_pinch, 0, place_station=1, probe=True)
+        self.assertEqual([step for step, _ in log if not step.startswith("base")], ["pull", "place"])
+        self.assertIsNone(self.mover.last_probe)
+        log, _ = self.run_turn(cfg, push, 1, place_station=1, probe=True)
+        self.assertEqual([step for step, _ in log if not step.startswith("base")][:2], ["push: start", "push"])
+
+    def test_edge_push_probe_pushes_backs_out_then_pulls_unprobed(self):
+        from jenga.probe import ProbePlan, ProbeRejected
+        cfg = make_cfg(EXTRACTION_METHOD="mixed", PROBE_EDGE_PUSH=True, PROBE_MAX_PULL_N=2.0, PROBE_MAX_PUSH_N=99.0)
+        with mock.patch.object(push, "plan_probe", return_value=ProbePlan(["r0", "r1"], ["p"], ["g"], ["b"])):
+            log, _ = self.run_turn(cfg, end_pinch, 0, place_station=1, probe=True,
+                                   force=[[0.0, -10.7, 0.0, 0, 0, 0], [0.0, -9.7, 0.0, 0, 0, 0]])
+            self.assertEqual([step for step, _ in log if not step.startswith("base")],
+                             ["edge_push: start", "edge_push", "pull", "place"])
+            self.assertEqual((self.mover.last_probe["step"], self.mover.last_probe["accepted"]), ("edge_push", True))
+            with self.assertRaises(ProbeRejected):
+                self.run_turn(cfg, end_pinch, 0, place_station=1, probe=True,
+                              force=[[0.0, -10.7, 0.0, 0, 0, 0], [0.0, -5.7, 0.0, 0, 0, 0]])
+
     def test_with_perception_a_probed_pull_records_its_grasp_for_the_in_hand_view(self):
         from jenga import perceive
         cfg = make_cfg(EXTRACTION_METHOD="end_pinch", PERCEPTION=True)
