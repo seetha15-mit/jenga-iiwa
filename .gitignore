@@ -11,4 +11,7 @@ scratch/
 runs_scratch/*
 *.sif
 logs/*
-!logs/.gitkeep
+!logs/.gitkeep# final run: videos, per-game block files and the zip stay out of git (docs/RESULTS.md)
+final_results/**/assets/
+final_results/**/*.html
+final_results/*.zip

@@ -1,0 +1,2 @@
+trial,seed,strategy,extraction_method,mover,friction_mode,perception,probe,n_layers_start,block_scale,contact_model,turns_attempted,blocks_replaced,collapsed,end_reason,collapse_reason,first_block,arm_collisions_unchecked,sim_seconds,wall_seconds,replay_file
+560,1560,rule_based,mixed,real,random,False,True,6,1.45,hydroelastic,10,9,True,collapse,block 9 moved 418.7 mm,11,True,484.9,1622.4,/home/seetha15/classes/fall26/robotics/jenga-iiwa/runs_scratch/final_7345e58/replays/H/rule_based_trial560/trial_560_replay.html

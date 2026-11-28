@@ -1,0 +1,2 @@
+trial,seed,strategy,extraction_method,mover,friction_mode,perception,probe,n_layers_start,block_scale,contact_model,turns_attempted,blocks_replaced,collapsed,end_reason,collapse_reason,first_block,arm_collisions_unchecked,sim_seconds,wall_seconds,replay_file
+520,1520,random,mixed,real,random,False,True,6,1.45,hydroelastic,2,0,True,collapse,block 17 moved 329.2 mm,1,True,92.2,417.7,/home/seetha15/classes/fall26/robotics/jenga-iiwa/runs_scratch/final_7345e58/replays/G/random_trial520/trial_520_replay.html

@@ -62,8 +62,8 @@ together; M2 is an equivalence test (TOST, margin +-0.5 blocks [user], set in ad
 44 games chosen by the plan's rules after the results: best, worst and typical game per condition, and for each
 comparison the trial where the second condition gained most and where it lost most.  All 44 reran identically
 (`cluster/replays.py verify`).  Manifest `final_results/replays/replays.csv`; for the video,
-`final_results/katie_replays/` (readable manifest, recreate commands, README; the videos are shared separately as
-`katie_replays.zip`).
+`final_results/selected_replays/` (readable manifest, recreate commands, README; the videos are shared separately as
+`selected_replays.zip`).
 
 ## Where the data is
 
@@ -73,4 +73,4 @@ with `python cluster/analyze_final.py final_results --commit 7345e58` (in the co
 
 Committed: those text files, `analysis/`, `replays/replays.csv` and `selection.csv`, and the bundle's text files.
 Not committed (too big; on ORCD only): the replay videos (`*.html`, 1.5 GB), each game's `assets/` (block files,
-made again from the seed) and `katie_replays.zip`.  Do not `git add final_results` as a whole.
+made again from the seed) and `selected_replays.zip`; `.gitignore` leaves them out.
