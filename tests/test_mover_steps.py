@@ -163,13 +163,13 @@ class TestRealMoverSteps(unittest.TestCase):
 
     def test_edge_push_probe_pushes_backs_out_then_pulls_unprobed(self):
         from jenga.probe import ProbePlan, ProbeRejected
-        cfg = make_cfg(EXTRACTION_METHOD="mixed", PROBE_EDGE_PUSH=True, PROBE_MAX_PUSH_N=2.0)
+        cfg = make_cfg(EXTRACTION_METHOD="mixed", PROBE_EDGE_PUSH=True, PROBE_MAX_PULL_N=2.0, PROBE_MAX_PUSH_N=99.0)
         with mock.patch.object(push, "plan_probe", return_value=ProbePlan(["r0", "r1"], ["p"], ["g"], ["b"])):
             log, _ = self.run_turn(cfg, end_pinch, 0, place_station=1, probe=True,
                                    force=[[0.0, -10.7, 0.0, 0, 0, 0], [0.0, -9.7, 0.0, 0, 0, 0]])
             self.assertEqual([step for step, _ in log if not step.startswith("base")],
-                             ["push: start", "push", "pull", "place"])
-            self.assertEqual((self.mover.last_probe["step"], self.mover.last_probe["accepted"]), ("push", True))
+                             ["edge_push: start", "edge_push", "pull", "place"])
+            self.assertEqual((self.mover.last_probe["step"], self.mover.last_probe["accepted"]), ("edge_push", True))
             with self.assertRaises(ProbeRejected):
                 self.run_turn(cfg, end_pinch, 0, place_station=1, probe=True,
                               force=[[0.0, -10.7, 0.0, 0, 0, 0], [0.0, -5.7, 0.0, 0, 0, 0]])

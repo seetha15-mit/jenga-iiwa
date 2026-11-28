@@ -208,7 +208,7 @@ class RealMover:
                 do("roll_to_probe", ex.move_base_to_station, world,
                    push_mod.choose_station(tower, block_id, cfg, world.station))
                 plan = push_mod.plan_probe(in_R(tower.block_pose(block_id)), cfg)
-                probed("push", plan._replace(go_on=plan.back_off))
+                probed("edge_push", plan._replace(go_on=plan.back_off))
             k_pull = method.choose_station(tower, block_id, cfg, world.station)
             do("roll_to_pull", ex.move_base_to_station, world, k_pull)
             X_WB = tower.block_pose(block_id)  # perceived with PERCEPTION, else the truth

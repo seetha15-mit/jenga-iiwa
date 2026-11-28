@@ -12,6 +12,8 @@
 #   small_measure   fast_measure with a 0.5 mm probe at 20 mm/s, force sampled every 5 ms (one plant step)
 #   edge_push       fast_measure, edges probed by a fingertip push along the block from an end face, then pulled
 #                   unprobed (PROBE_EDGE_PUSH)
+#   all_thr         edge_push with thresholds by the same rule (reject the 10% that resist most): middles 5.1 N,
+#                   edges 3.9 N (the 90th percentiles of push_only's middle and edge_push's edge readings)
 # Run from a frozen worktree of the commit under test:  bash cluster/probe_sweep.sh <out_dir> [setting ...]
 # (no settings named: all of them)
 set -e
@@ -37,6 +39,7 @@ for s in ${@:-off measure current random_off random_current}; do
     fast_measure)   echo "$s $(sub $s rule_based "$MEASURE PROBE_SECONDS=0.1")" ;;
     push_only)      echo "$s $(sub $s rule_based "$MEASURE PROBE_SECONDS=0.1 PROBE_END_PULLS=False")" ;;
     edge_push)      echo "$s $(sub $s rule_based "$MEASURE PROBE_SECONDS=0.1 PROBE_EDGE_PUSH=True")" ;;
+    all_thr)        echo "$s $(sub $s rule_based "PROBE_ENABLED=True PROBE_SECONDS=0.1 PROBE_EDGE_PUSH=True PROBE_MAX_PUSH_N=5.1 PROBE_MAX_PULL_N=3.9")" ;;
     small_measure)  echo "$s $(sub $s rule_based "$MEASURE PROBE_DIST_M=0.0005 PROBE_SECONDS=0.025 SAMPLE_DT_S=0.005")" ;;
     *) echo "unknown setting $s" >&2; exit 1 ;;
   esac

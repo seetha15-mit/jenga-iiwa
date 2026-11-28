@@ -37,6 +37,7 @@ class TestProbeRules(unittest.TestCase):
         self.assertFalse(probe.accept(6.5, cfg, "push"))
         self.assertTrue(probe.accept(99.0, make_cfg(PROBE_MAX_PULL_N=7.0, PROBE_MAX_PUSH_N=None), "push"))  # never
         self.assertEqual(probe.max_force(cfg, "push"), 3.5)
+        self.assertEqual(probe.max_force(cfg, "edge_push"), cfg.PROBE_MAX_PULL_N)  # edges share the edge threshold
 
     def test_fallback_is_the_least_resisting_block(self):
         self.assertEqual(probe.fallback({4: 3.0, 7: 1.5, 2: 2.0}), 7)
