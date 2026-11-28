@@ -145,7 +145,7 @@ class TestRealMoverSteps(unittest.TestCase):
     # reading 1 with p (the probe's end, where the verdict is taken)
 
     def test_a_probe_that_gives_way_goes_on_in_the_same_motion(self):
-        cfg = make_cfg(EXTRACTION_METHOD="mixed", PROBE_MAX_PULL_N=2.0, PROBE_MAX_PUSH_N=2.0)
+        cfg = make_cfg(EXTRACTION_METHOD="mixed", PROBE_MAX_PULL_N=2.0, PROBE_MAX_PUSH_N=2.0, PROBE_END_PULLS=True)
         force = [[0.0, -10.7, 0.0, 0, 0, 0], [0.0, -9.7, 0.0, 0, 0, 0]]  # 1 N over the tare
         log, _ = self.run_turn(cfg, end_pinch, 0, place_station=1, probe=True, force=force)
         self.assertEqual([step for step, _ in log if not step.startswith("base")], ["pull: start", "pull", "place"])
@@ -163,7 +163,8 @@ class TestRealMoverSteps(unittest.TestCase):
 
     def test_edge_push_probe_pushes_backs_out_then_pulls_unprobed(self):
         from jenga.probe import ProbePlan, ProbeRejected
-        cfg = make_cfg(EXTRACTION_METHOD="mixed", PROBE_EDGE_PUSH=True, PROBE_MAX_PULL_N=2.0, PROBE_MAX_PUSH_N=99.0)
+        cfg = make_cfg(EXTRACTION_METHOD="mixed", PROBE_END_PULLS=True, PROBE_EDGE_PUSH=True, PROBE_MAX_PULL_N=2.0,
+                       PROBE_MAX_PUSH_N=99.0)
         with mock.patch.object(push, "plan_probe", return_value=ProbePlan(["r0", "r1"], ["p"], ["g"], ["b"])):
             log, _ = self.run_turn(cfg, end_pinch, 0, place_station=1, probe=True,
                                    force=[[0.0, -10.7, 0.0, 0, 0, 0], [0.0, -9.7, 0.0, 0, 0, 0]])
@@ -176,7 +177,7 @@ class TestRealMoverSteps(unittest.TestCase):
 
     def test_with_perception_a_probed_pull_records_its_grasp_for_the_in_hand_view(self):
         from jenga import perceive
-        cfg = make_cfg(EXTRACTION_METHOD="end_pinch", PERCEPTION=True)
+        cfg = make_cfg(EXTRACTION_METHOD="end_pinch", PERCEPTION=True, PROBE_END_PULLS=True)
         with mock.patch.object(perceive, "record_grasp") as rec:
             log, _ = self.run_turn(cfg, end_pinch, 0, place_station=1, probe=True)
         rec.assert_called_once()
